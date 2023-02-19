@@ -1,0 +1,10 @@
+[package]
+name = "mqttmonitor"
+version = "0.1.0"
+edition = "2021"
+authors = ["Tobias Schmitt <hi@tobischmitt.net>"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+rumqttc = "0.20.0"
