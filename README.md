@@ -5,14 +5,13 @@ The goal of this project is to deliver a general MQTT GUI whose internal code is
 
 Currently, the following features are planned:
 - [] UI
-  - Terminal UI (tui)
   - Server Mode with Web UI
   - Client Mode (WASM only) with Web UI, also delivered as Tauri App
 - [] MQTT Monitoring
   - subscribe to Topics
   - collect statistics
   - store statistics
-- [] Automation (for now only available in server mode)
+- [] Automation (for now only available in server)
   - simple automation tasks which can do things based on a topic input
   - scriptable with RHAI / Lua / Python
 
@@ -24,5 +23,5 @@ Personally, I think the MQTT world is missing a sophisticated UI which has enoug
 
 I think, that Rust is giving the perfect opportunity to reach this goal due to the very detailed workspace structure, available libraries and code exporting possibilites (C lib, WASM, Python etc.).
 
-Also, it's just a fun project for me to get deeper insight into Cargo Workspaces, TUI, Tauri and Web Backends such as Rocket or Warp.
+Also, it's just a fun project for me to get deeper insight into Cargo Workspaces, Tauri and Web Backends such as Rocket or Warp.
   
