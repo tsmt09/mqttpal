@@ -1,4 +1,7 @@
 use std::collections::HashMap;
+use chrono::NaiveDateTime;
+use diesel::prelude::*;
+use diesel::SqliteConnection;
 use middleware::htmx::Htmx;
 use middleware::user::SayHi;
 use actix_files::{Files, NamedFile};
@@ -11,9 +14,11 @@ use askama::Template;
 use base64::Engine;
 
 use crate::middleware::htmx::HtmxHeaders;
-
+use crate::models::user::User;
+use crate::schema::users::dsl::*;
 mod middleware;
 mod models;
+pub mod schema;
 
 #[derive(Template)]
 #[template(path = "login.html")]
@@ -99,7 +104,28 @@ fn get_session_key() -> Key {
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    let user = models::user::User {
+        id: 1,
+        name: "asd".into(), // "asd
+        email: "asd".into(),
+        password: "asd".into(),
+        remember: false,
+        created_at: chrono::Utc::now().naive_utc(),
+        updated_at: chrono::Utc::now().naive_utc(),
+        role_id: 1,
+    };
     dotenv::dotenv().ok();
+    let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+    let mut conn = SqliteConnection::establish(&database_url)
+        .expect(&format!("Error connecting to {}", database_url));
+    diesel::insert_into(schema::users::table)
+        .values(&user)
+        .execute(&mut conn)
+        .expect("Error inserting user");
+
+    let user: User = users.filter(schema::users::id.eq(1)).first::<models::user::User>(&mut conn).unwrap();
+    println!("User: {:?}", user);
+    return Ok(());
     pretty_env_logger::init_timed();
     log::info!("Booting MQTTPal");
     HttpServer::new(|| {
