@@ -1,29 +1,50 @@
-use std::collections::HashMap;
-use chrono::NaiveDateTime;
+use actix_files::{NamedFile};
+use actix_session::SessionExt;
+use actix_session::{storage::CookieSessionStore, Session, SessionMiddleware};
+use actix_web::{ get, web,
+    cookie::Key,  App, HttpMessage, HttpRequest, HttpResponse,
+    HttpServer, Responder, dev::Service
+};
+use futures_util::FutureExt;
+use askama::Template;
+use base64::Engine;
 use diesel::prelude::*;
 use diesel::SqliteConnection;
 use middleware::htmx::Htmx;
 use middleware::user::SayHi;
-use actix_files::{Files, NamedFile};
-use actix_session::{storage::CookieSessionStore, Session, SessionMiddleware, SessionStatus};
-use actix_web::{
-    cookie::Key, dev::Service, get, post, web, App, HttpRequest, HttpResponse, HttpServer,
-    Responder, HttpMessage,
-};
-use askama::Template;
-use base64::Engine;
-
+use clap::Args;
+use clap::Parser;
+use clap::Subcommand;
 use crate::middleware::htmx::HtmxHeaders;
-use crate::models::user::User;
-use crate::schema::users::dsl::*;
+
+pub mod schema;
 mod middleware;
 mod models;
-pub mod schema;
+mod login;
 
-#[derive(Template)]
-#[template(path = "login.html")]
-struct LoginTemplate {
-    hx: bool,
+pub type DbPool = diesel::r2d2::Pool<diesel::r2d2::ConnectionManager<SqliteConnection>>;
+
+#[derive(Subcommand, Debug)]
+enum CliCommands {
+    Serve,
+    CreateSessionKey,
+    CreateUser(CreateUserArgs),
+}
+
+#[derive(Args, Debug)]
+struct CreateUserArgs {
+    name: String,
+    password: String,
+    email: Option<String>
+}
+
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+#[command(propagate_version = true)]
+struct CliArgs {
+    // command used (default "server")
+    #[command(subcommand)]
+    command: CliCommands,
 }
 
 #[derive(Template)]
@@ -34,17 +55,17 @@ struct DashboardTemplate {
 
 #[get("/")]
 async fn index() -> impl Responder {
-    let local_login = LoginTemplate { hx: false };
+    let local_login = login::LoginTemplate { hx: false };
     HttpResponse::Ok().body(local_login.render().unwrap())
 }
 
-#[get("/dashboard")]
+#[get("/")]
 async fn dashboard(req: HttpRequest) -> impl Responder {
     let template = if let Some(htmx) = req.extensions_mut().get_mut::<HtmxHeaders>() {
         log::debug!("Is htmx req? {}", htmx.request());
         if htmx.request() {
             log::debug!("Set redirect!");
-            htmx.set_push_url("/dashboard");
+            htmx.set_push_url("/dashboard/");
         }
         DashboardTemplate { hx: htmx.request() }
     } else {
@@ -53,34 +74,9 @@ async fn dashboard(req: HttpRequest) -> impl Responder {
     HttpResponse::Ok().body(template.render().unwrap())
 }
 
-#[get("/login")]
-async fn login(req: HttpRequest) -> impl Responder {
-    let template = if let Some(htmx) = req.extensions_mut().get_mut::<HtmxHeaders>() {
-        log::debug!("Is htmx req? {}", htmx.request());
-        if htmx.request() {
-            log::debug!("Set redirect!");
-            htmx.set_push_url("/login");
-        }
-        LoginTemplate { hx: htmx.request() }
-    } else {
-        LoginTemplate { hx: false }
-    };
-    HttpResponse::Ok().body(template.render().unwrap())
-}
-
-#[post("/login")]
-async fn login_post(form: web::Form<models::user::UserForm>, session: Session) -> impl Responder {
-    log::debug!("User: {form:?}");
-    log::debug!("Session status: {:?}", session.status());
-    HttpResponse::Unauthorized()
-        .append_header(("HX-Retarget", "#form-errors"))
-        .append_header(("HX-Reswap", "innerHTML"))
-        .body("<mark>Password wrong or user unknown.</mark>")
-    //HttpResponse::Ok().append_header(("HX-Redirect", "/")).finish()
-}
 
 #[get("/favicon.ico")]
-async fn favicon(session: Session) -> impl Responder {
+async fn favicon(_session: Session) -> impl Responder {
     NamedFile::open_async("static/favicon.ico").await
 }
 
@@ -104,61 +100,68 @@ fn get_session_key() -> Key {
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    let user = models::user::User {
-        id: 1,
-        name: "asd".into(), // "asd
-        email: "asd".into(),
-        password: "asd".into(),
-        remember: false,
-        created_at: chrono::Utc::now().naive_utc(),
-        updated_at: chrono::Utc::now().naive_utc(),
-        role_id: 1,
-    };
     dotenv::dotenv().ok();
-    let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-    let mut conn = SqliteConnection::establish(&database_url)
-        .expect(&format!("Error connecting to {}", database_url));
-    diesel::insert_into(schema::users::table)
-        .values(&user)
-        .execute(&mut conn)
-        .expect("Error inserting user");
-
-    let user: User = users.filter(schema::users::id.eq(1)).first::<models::user::User>(&mut conn).unwrap();
-    println!("User: {:?}", user);
-    return Ok(());
     pretty_env_logger::init_timed();
-    log::info!("Booting MQTTPal");
-    HttpServer::new(|| {
-        App::new()
-            .wrap(actix_web::middleware::Logger::default())
-            .wrap(SessionMiddleware::new(
-                CookieSessionStore::default(),
-                get_session_key(),
-            ))
-            .wrap(Htmx)
-            .wrap(SayHi)
-            // resources which are always available
-            .service(actix_files::Files::new("/css/", "static/css/"))
-            .service(actix_files::Files::new("/js/", "static/js/"))
-            .service(actix_files::Files::new("/svg/", "static/svg/"))
-            .service(login)
-            .service(login_post)
-            .service(favicon)
-            .service(index)
-            .service(dashboard)
-        // guarded resources
-        /* .service(
-            web::route("/")
-            .wrap_fn(|req, srv| {
-                log::info!("Guard Middleware enter");
-                srv.call(req).map(|res| {
-                    log::info!("Guard Middleware exit");
-                    res
-                })
+    let cli = CliArgs::parse();
+    log::debug!("Command Line Args: {:?}", cli);
+    let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+    let manager = diesel::r2d2::ConnectionManager::<SqliteConnection>::new(&database_url);
+    let pool = diesel::r2d2::Pool::builder().build(manager).expect("failed to build connection pool");
+    match cli.command {
+        CliCommands::CreateSessionKey => {
+            create_session_key();
+            return Ok(());
+        },
+        CliCommands::CreateUser(user) => {
+            let user = models::user::NewUser {
+                name: &user.name,
+                password: &user.password,
+                email: user.email.as_deref(),
+            };
+            let mut conn = pool.get().expect("cannot get connection from pool!");
+            let result = user.insert(&mut conn);
+            log::info!("Inserted User: {result:?}");
+            // do some serve
+            return Ok(());
+        }
+        CliCommands::Serve => {
+            HttpServer::new(move || {
+                App::new()
+                    .app_data(web::Data::new(pool.clone()))
+                    .wrap(actix_web::middleware::Logger::default())
+                    .wrap(SessionMiddleware::new(
+                        CookieSessionStore::default(),
+                        get_session_key(),
+                    ))
+                    .wrap(Htmx)
+                    .service(
+                        web::scope("/dashboard")
+                            .wrap_fn(|req, srv| {
+                                // TODO: https://stackoverflow.com/questions/57892819/how-to-return-an-early-response-from-an-actix-web-middleware
+                                log::info!("Guard Middleware enter");
+                                let session = req.get_session();
+                                let is_loggedin = session.get::<String>("loggedin").unwrap_or(None).is_some();
+                                log::debug!("user logged in: {:?}", is_loggedin);
+                                srv.call(req).map(|res| {
+                                    log::info!("Guard Middleware exit");
+                                    res
+                                })
+                            })
+                            .service(dashboard)
+                    )
+                    // resources which are always available
+                    .service(actix_files::Files::new("/css/", "static/css/"))
+                    .service(actix_files::Files::new("/js/", "static/js/"))
+                    .service(actix_files::Files::new("/svg/", "static/svg/"))
+                    .service(login::login)
+                    .service(login::login_post)
+                    .service(favicon)
+                    .service(index)
+                // guarded resources
             })
-        )*/
-    })
-    .bind(("0.0.0.0", 8081))?
-    .run()
-    .await
+            .bind(("0.0.0.0", 8081))?
+            .run()
+            .await
+        }
+    }
 }

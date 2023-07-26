@@ -1,15 +1,14 @@
 {% if !hx %}
 {% include "top.html" %}
 {% endif %}
-      <form hx-post="/login">
+      <form hx-post="/login/">
         <div class="form-group">
-          <label for="exampleInputEmail1">Email address</label>
-          <input type="email" class="form-control" id="exampleInputEmail1" aria-describedby="emailHelp" name="email" autocomplete="email" required>
-          <small id="emailHelp" class="form-text text-muted">We'll never share your email with anyone else.</small>
+          <label for="exampleInputEmail1">Name</label>
+          <input type="text" class="form-control" id="loginName" name="name" autocomplete="username" required>
         </div>
         <div class="form-group">
           <label for="exampleInputPassword1">Password</label>
-          <input type="password" class="form-control" id="exampleInputPassword1" name="password" autocomplete="password" required>
+          <input type="password" class="form-control" id="loginPassword" name="password" autocomplete="password" required>
         </div>
         <div class="form-group form-check">
           <input type="checkbox" class="form-check-input" id="exampleCheck1" name="remember">
@@ -17,6 +16,7 @@
         </div>
         <button type="submit" class="btn btn-primary">Login</button>
       </form>
+      <div id="form-errors"></div>
 {% if !hx %}
 {% include "bottom.html" %}
 {% endif %}

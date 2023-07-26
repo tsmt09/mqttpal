@@ -1,7 +1,7 @@
 use actix_web::{
     dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform},
-    http::header::{HeaderMap, Header, HeaderName, HeaderValue},
-    Error, HttpMessage, FromRequest,
+    http::header::{Header, HeaderMap, HeaderName, HeaderValue},
+    Error, FromRequest, HttpMessage,
 };
 use futures_util::future::LocalBoxFuture;
 use std::future::{ready, Ready};
@@ -25,6 +25,7 @@ pub struct HtmxHeaders {
     refresh: Option<String>,
     replace_url: Option<String>,
     reswap: Option<String>,
+    retarget: Option<String>,
     reselect: Option<String>,
     response_trigger: Option<String>,
     trigger_after_settle: Option<String>,
@@ -76,6 +77,9 @@ impl HtmxHeaders {
             reswap: map
                 .get("hx-reswap")
                 .map(|v| v.to_str().unwrap().to_string()),
+            retarget: map
+                .get("hx-retarget")
+                .map(|v| v.to_str().unwrap().to_string()),
             reselect: map
                 .get("hx-reselect")
                 .map(|v| v.to_str().unwrap().to_string()),
@@ -91,90 +95,129 @@ impl HtmxHeaders {
         }
     }
     fn write_headers(&self, map: &mut HeaderMap) {
-      if let Some(location) = &self.location {
-        map.insert(HeaderName::from_static("hx-location"), HeaderValue::from_str(&location).unwrap());
-      } 
-      if let Some(push_url) = &self.push_url {
-        map.insert(HeaderName::from_static("hx-push-url"), HeaderValue::from_str(&push_url).unwrap());
-      }
-      if let Some(redirect) = &self.redirect {
-        map.insert(HeaderName::from_static("hx-redirect"), HeaderValue::from_str(&redirect).unwrap());
-      }
-      if let Some(refresh) = &self.refresh {
-        map.insert(HeaderName::from_static("hx-refresh"), HeaderValue::from_str(&refresh).unwrap());
-      }
-      if let Some(replace_url) = &self.replace_url {
-        map.insert(HeaderName::from_static("hx-replace-url"), HeaderValue::from_str(&replace_url).unwrap());
-      }
-      if let Some(reswap) = &self.reswap {
-        map.insert(HeaderName::from_static("hx-reswap"), HeaderValue::from_str(&reswap).unwrap());
-      }
-      if let Some(reselect) = &self.reselect {
-        map.insert(HeaderName::from_static("hx-reselect"), HeaderValue::from_str(&reselect).unwrap());
-      }
-      if let Some(response_trigger) = &self.response_trigger {
-        map.insert(HeaderName::from_static("hx-trigger"), HeaderValue::from_str(&response_trigger).unwrap());
-      }
-      if let Some(trigger_after_settle) = &self.trigger_after_settle {
-        map.insert(HeaderName::from_static("hx-trigger-after-settle"), HeaderValue::from_str(&trigger_after_settle).unwrap());
-      }
-      if let Some(trigger_after_swap) = &self.trigger_after_swap {
-        map.insert(HeaderName::from_static("hx-trigger-after-swap"), HeaderValue::from_str(&trigger_after_swap).unwrap());
-      }
+        if let Some(location) = &self.location {
+            map.insert(
+                HeaderName::from_static("hx-location"),
+                HeaderValue::from_str(&location).unwrap(),
+            );
+        }
+        if let Some(push_url) = &self.push_url {
+            map.insert(
+                HeaderName::from_static("hx-push-url"),
+                HeaderValue::from_str(&push_url).unwrap(),
+            );
+        }
+        if let Some(redirect) = &self.redirect {
+            map.insert(
+                HeaderName::from_static("hx-redirect"),
+                HeaderValue::from_str(&redirect).unwrap(),
+            );
+        }
+        if let Some(refresh) = &self.refresh {
+            map.insert(
+                HeaderName::from_static("hx-refresh"),
+                HeaderValue::from_str(&refresh).unwrap(),
+            );
+        }
+        if let Some(replace_url) = &self.replace_url {
+            map.insert(
+                HeaderName::from_static("hx-replace-url"),
+                HeaderValue::from_str(&replace_url).unwrap(),
+            );
+        }
+        if let Some(reswap) = &self.reswap {
+            map.insert(
+                HeaderName::from_static("hx-reswap"),
+                HeaderValue::from_str(&reswap).unwrap(),
+            );
+        }
+        if let Some(reselect) = &self.reselect {
+            map.insert(
+                HeaderName::from_static("hx-reselect"),
+                HeaderValue::from_str(&reselect).unwrap(),
+            );
+        }
+        if let Some(retarget) = &self.retarget {
+            map.insert(
+                HeaderName::from_static("hx-retarget"),
+                HeaderValue::from_str(&retarget).unwrap(),
+            );
+        }
+        if let Some(response_trigger) = &self.response_trigger {
+            map.insert(
+                HeaderName::from_static("hx-trigger"),
+                HeaderValue::from_str(&response_trigger).unwrap(),
+            );
+        }
+        if let Some(trigger_after_settle) = &self.trigger_after_settle {
+            map.insert(
+                HeaderName::from_static("hx-trigger-after-settle"),
+                HeaderValue::from_str(&trigger_after_settle).unwrap(),
+            );
+        }
+        if let Some(trigger_after_swap) = &self.trigger_after_swap {
+            map.insert(
+                HeaderName::from_static("hx-trigger-after-swap"),
+                HeaderValue::from_str(&trigger_after_swap).unwrap(),
+            );
+        }
     }
     pub fn boosted(&self) -> bool {
-      self.boosted.unwrap_or(false)
+        self.boosted.unwrap_or(false)
     }
     pub fn current_url(&self) -> &Option<String> {
-      &self.current_url
+        &self.current_url
     }
     pub fn history_restore_request(&self) -> bool {
-      self.history_restore_request.unwrap_or(false)
+        self.history_restore_request.unwrap_or(false)
     }
     pub fn prompt(&self) -> &Option<String> {
-      &self.prompt
+        &self.prompt
     }
     pub fn request(&self) -> bool {
-      self.request.unwrap_or(false)
+        self.request.unwrap_or(false)
     }
     pub fn target(&self) -> &Option<String> {
-      &self.target
+        &self.target
     }
     pub fn trigger_name(&self) -> &Option<String> {
-      &self.trigger_name
+        &self.trigger_name
     }
     pub fn trigger(&self) -> &Option<String> {
-      &self.trigger
+        &self.trigger
     }
     pub fn set_location(&mut self, location: &str) {
-      self.location = Some(location.to_string());
+        self.location = Some(location.to_string());
     }
     pub fn set_push_url(&mut self, push_url: &str) {
-      self.push_url = Some(push_url.to_string());
+        self.push_url = Some(push_url.to_string());
     }
     pub fn set_redirect(&mut self, redirect: &str) {
-      self.redirect = Some(redirect.to_string());
+        self.redirect = Some(redirect.to_string());
     }
     pub fn set_refresh(&mut self, refresh: &str) {
-      self.refresh = Some(refresh.to_string());
+        self.refresh = Some(refresh.to_string());
     }
     pub fn set_replace_url(&mut self, replace_url: &str) {
-      self.replace_url = Some(replace_url.to_string());
+        self.replace_url = Some(replace_url.to_string());
     }
     pub fn set_reswap(&mut self, reswap: &str) {
-      self.reswap = Some(reswap.to_string());
+        self.reswap = Some(reswap.to_string());
     }
     pub fn set_reselect(&mut self, reselect: &str) {
-      self.reselect = Some(reselect.to_string());
+        self.reselect = Some(reselect.to_string());
+    }
+    pub fn set_retarget(&mut self, retarget: &str) {
+        self.retarget = Some(retarget.to_string());
     }
     pub fn set_trigger(&mut self, trigger: &str) {
-      self.response_trigger = Some(trigger.to_string());
+        self.response_trigger = Some(trigger.to_string());
     }
     pub fn set_trigger_after_settle(&mut self, trigger_after_settle: &str) {
-      self.trigger_after_settle = Some(trigger_after_settle.to_string());
+        self.trigger_after_settle = Some(trigger_after_settle.to_string());
     }
     pub fn set_trigger_after_swap(&mut self, trigger_after_swap: &str) {
-      self.trigger_after_swap = Some(trigger_after_swap.to_string());
+        self.trigger_after_swap = Some(trigger_after_swap.to_string());
     }
 }
 

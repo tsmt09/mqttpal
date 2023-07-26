@@ -16,5 +16,6 @@ futures-util = "0.3.28"
 askama = "0.12.0"
 dotenv = "0.15.0"
 serde = { version = "1.0.171", features = ["derive"] }
-diesel = { version = "2.1.0", features = ["sqlite", "chrono"] }
+diesel = { version = "2.1.0", features = ["sqlite", "chrono", "returning_clauses_for_sqlite_3_35", "r2d2"] }
 chrono = "0.4.26"
+clap = { version = "4.3.19", features = ["derive"] }
