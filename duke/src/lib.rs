@@ -1,3 +1,6 @@
+mod duke;
+pub use crate::duke::Node;
+
 pub fn add(left: usize, right: usize) -> usize {
     left + right
 }

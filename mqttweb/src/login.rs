@@ -1,25 +1,23 @@
-use askama::Template;
-use actix_web::{web, get, post, Responder, HttpRequest, HttpResponse, HttpMessage};
-use actix_session::Session;
 use crate::{middleware::htmx::HtmxHeaders, models::user::User};
-use serde::{Serialize, Deserialize};
+use actix_session::Session;
+use actix_web::{get, post, web, HttpMessage, HttpRequest, HttpResponse, Responder};
+use askama::Template;
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug)]
 struct LoginForm {
     name: String,
-    password: String
+    password: String,
 }
-
 
 #[derive(Template)]
 #[template(path = "login.html")]
 pub struct LoginTemplate {
-   pub hx: bool,
+    pub hx: bool,
 }
 
 #[get("/login/")]
 async fn login(req: HttpRequest) -> impl Responder {
-
     let template = if let Some(htmx) = req.extensions_mut().get_mut::<HtmxHeaders>() {
         log::debug!("Is htmx req? {}", htmx.request());
         if htmx.request() {
@@ -34,7 +32,12 @@ async fn login(req: HttpRequest) -> impl Responder {
 }
 
 #[post("/login/")]
-async fn login_post(req: HttpRequest, db: web::Data<crate::DbPool>, form: web::Form<LoginForm>, session: Session) -> impl Responder {
+async fn login_post(
+    req: HttpRequest,
+    db: web::Data<crate::DbPool>,
+    form: web::Form<LoginForm>,
+    session: Session,
+) -> impl Responder {
     log::debug!("User: {form:?}");
     let mut conn = db.get().expect("no connection available");
     let is_user = User::check(&mut conn, &form.name, &form.password);
@@ -53,8 +56,7 @@ async fn login_post(req: HttpRequest, db: web::Data<crate::DbPool>, form: web::F
             } else {
                 htmx.set_retarget("#form-errors");
                 htmx.set_reswap("innerHtml");
-                HttpResponse::Ok()
-                    .body("<mark>Password wrong or user unknown.</mark>")
+                HttpResponse::Ok().body("<mark>Password wrong or user unknown.</mark>")
             }
         } else {
             HttpResponse::Unauthorized().finish()
@@ -63,4 +65,3 @@ async fn login_post(req: HttpRequest, db: web::Data<crate::DbPool>, form: web::F
         HttpResponse::Unauthorized().finish()
     }
 }
-

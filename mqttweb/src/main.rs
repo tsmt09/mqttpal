@@ -1,26 +1,23 @@
-use actix_files::{NamedFile};
-use actix_session::SessionExt;
+use crate::middleware::htmx::HtmxHeaders;
+use crate::models::authorized::Authorized;
+use actix_files::NamedFile;
 use actix_session::{storage::CookieSessionStore, Session, SessionMiddleware};
-use actix_web::{ get, web,
-    cookie::Key,  App, HttpMessage, HttpRequest, HttpResponse,
-    HttpServer, Responder, dev::Service
+use actix_web::{
+    cookie::Key, get, web, App, HttpMessage, HttpRequest, HttpResponse, HttpServer,
+    Responder,
 };
-use futures_util::FutureExt;
 use askama::Template;
 use base64::Engine;
-use diesel::prelude::*;
-use diesel::SqliteConnection;
-use middleware::htmx::Htmx;
-use middleware::user::SayHi;
 use clap::Args;
 use clap::Parser;
 use clap::Subcommand;
-use crate::middleware::htmx::HtmxHeaders;
+use diesel::SqliteConnection;
+use middleware::htmx::Htmx;
 
-pub mod schema;
+mod login;
 mod middleware;
 mod models;
-mod login;
+pub mod schema;
 
 pub type DbPool = diesel::r2d2::Pool<diesel::r2d2::ConnectionManager<SqliteConnection>>;
 
@@ -35,7 +32,7 @@ enum CliCommands {
 struct CreateUserArgs {
     name: String,
     password: String,
-    email: Option<String>
+    email: Option<String>,
 }
 
 #[derive(Parser, Debug)]
@@ -60,7 +57,7 @@ async fn index() -> impl Responder {
 }
 
 #[get("/")]
-async fn dashboard(req: HttpRequest) -> impl Responder {
+async fn dashboard(req: HttpRequest, _: Authorized) -> impl Responder {
     let template = if let Some(htmx) = req.extensions_mut().get_mut::<HtmxHeaders>() {
         log::debug!("Is htmx req? {}", htmx.request());
         if htmx.request() {
@@ -73,7 +70,6 @@ async fn dashboard(req: HttpRequest) -> impl Responder {
     };
     HttpResponse::Ok().body(template.render().unwrap())
 }
-
 
 #[get("/favicon.ico")]
 async fn favicon(_session: Session) -> impl Responder {
@@ -106,12 +102,14 @@ async fn main() -> std::io::Result<()> {
     log::debug!("Command Line Args: {:?}", cli);
     let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
     let manager = diesel::r2d2::ConnectionManager::<SqliteConnection>::new(&database_url);
-    let pool = diesel::r2d2::Pool::builder().build(manager).expect("failed to build connection pool");
+    let pool = diesel::r2d2::Pool::builder()
+        .build(manager)
+        .expect("failed to build connection pool");
     match cli.command {
         CliCommands::CreateSessionKey => {
             create_session_key();
             return Ok(());
-        },
+        }
         CliCommands::CreateUser(user) => {
             let user = models::user::NewUser {
                 name: &user.name,
@@ -136,18 +134,11 @@ async fn main() -> std::io::Result<()> {
                     .wrap(Htmx)
                     .service(
                         web::scope("/dashboard")
-                            .wrap_fn(|req, srv| {
-                                // TODO: https://stackoverflow.com/questions/57892819/how-to-return-an-early-response-from-an-actix-web-middleware
-                                log::info!("Guard Middleware enter");
-                                let session = req.get_session();
-                                let is_loggedin = session.get::<String>("loggedin").unwrap_or(None).is_some();
-                                log::debug!("user logged in: {:?}", is_loggedin);
-                                srv.call(req).map(|res| {
-                                    log::info!("Guard Middleware exit");
-                                    res
-                                })
-                            })
-                            .service(dashboard)
+                            .wrap(SessionMiddleware::new(
+                                CookieSessionStore::default(),
+                                get_session_key(),
+                            ))
+                            .service(dashboard),
                     )
                     // resources which are always available
                     .service(actix_files::Files::new("/css/", "static/css/"))
