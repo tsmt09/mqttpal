@@ -20,7 +20,7 @@
         }
       },
       "args": ["serve"],
-      "cwd": "${workspaceFolder}"
+      "cwd": "${workspaceFolder}/mqttweb"
     },
     {
       "type": "lldb",
