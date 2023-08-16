@@ -9,11 +9,25 @@
     </button>
     <div class="collapse navbar-collapse" id="navbarNavDropdown">
       <ul class="navbar-nav">
-        <li class="nav-item active">
+        <li class="nav-item">
           <a class="nav-link" hx-get="/dashboard/" hx-target="#mainWindow" hx-push-url="true">Dashboard</a>
         </li>
         <li class="nav-item">
-          <a class="nav-link" hx-get="/login/" hx-target="#mainWindow" hx-push-url="true">Login</a>
+          {% match user %}
+            {% when Some (val) %}
+              <a class="nav-link" hx-get="/users/" hx-target="#mainWindow" hx-push-url="true">Users</a>
+            {% else %}
+          {% endmatch %}
+        </li>
+      </ul>
+      <ul class="navbar-nav">
+        <li class="nav-item">
+          {% match user %}
+            {% when None %}
+              <a class="nav-link" hx-get="/login/" hx-target="#mainWindow" hx-push-url="true">Login</a>
+            {% when Some (val) %}
+              <a class="nav-link" hx-post="/logout/" hx-push-url="true">Logout ({{ val }})</a>
+          {% endmatch %}
         </li>
       </ul>
     </div>

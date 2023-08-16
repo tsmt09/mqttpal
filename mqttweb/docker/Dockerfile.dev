@@ -1,0 +1,47 @@
+# Use the official Rust image as the base image
+FROM rust:bookworm
+
+# Set the working directory
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && \
+    apt-get install -y \
+    libssl-dev libsqlite3-dev
+
+# Install `cargo watch`
+RUN cargo install cargo-watch
+
+# install diesel_cli
+RUN cargo install diesel_cli --no-default-features --features sqlite
+
+# Create a new empty cargo project
+RUN cargo new --bin mqttweb
+WORKDIR /app/mqttweb
+
+# Copy over the cargo.toml file
+COPY Cargo.toml ./
+# Copy the rest of the source code
+COPY ./src ./src
+COPY ./templates ./templates
+COPY ./migrations ./migrations
+COPY ./static ./static
+
+# Build the project to download dependencies
+RUN cargo build
+
+# run database migration
+ENV DATABASE_URL=sqlite://mqttweb.db
+RUN diesel migration run
+
+ARG INIT_USER_NAME=super
+ARG INIT_USER_PASSWORD=dev
+ENV INIT_USER_EMAIL=super@dev.de
+RUN target/debug/mqttweb create-user $INIT_USER_NAME $INIT_USER_PASSWORD $INIT_USER_EMAIL 
+
+# Set the environment variables
+ENV RUST_LOG=info
+ENV RUST_BACKTRACE=1
+
+# Start the server using `cargo watch`
+CMD ["cargo", "watch", "-x", "run serve"]

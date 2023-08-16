@@ -1,4 +1,7 @@
-use crate::{middleware::htmx::HtmxHeaders, models::user::User};
+use crate::{
+    middleware::{htmx::HtmxHeaders, login_guard::LoginGuard, user_session::UserSession},
+    models::user::User,
+};
 use actix_session::Session;
 use actix_web::{get, post, web, HttpMessage, HttpRequest, HttpResponse, Responder};
 use askama::Template;
@@ -14,21 +17,40 @@ struct LoginForm {
 #[template(path = "login.html")]
 pub struct LoginTemplate {
     pub hx: bool,
+    pub user: Option<String>,
 }
 
 #[get("/login/")]
-async fn login(req: HttpRequest) -> impl Responder {
+async fn login(req: HttpRequest, usersession: UserSession) -> impl Responder {
     let template = if let Some(htmx) = req.extensions_mut().get_mut::<HtmxHeaders>() {
         log::debug!("Is htmx req? {}", htmx.request());
         if htmx.request() {
             log::debug!("Set redirect!");
             htmx.set_push_url("/login/");
         }
-        LoginTemplate { hx: htmx.request() }
+        LoginTemplate {
+            hx: htmx.request(),
+            user: usersession.username,
+        }
     } else {
-        LoginTemplate { hx: false }
+        LoginTemplate {
+            hx: false,
+            user: usersession.username,
+        }
     };
     HttpResponse::Ok().body(template.render().unwrap())
+}
+
+#[post("/logout/")]
+async fn logout(_: LoginGuard, req: HttpRequest, session: Session) -> impl Responder {
+    session.purge();
+    if let Some(htmx) = req.extensions_mut().get_mut::<HtmxHeaders>() {
+        if htmx.request() {
+            htmx.set_redirect("/login/");
+            return HttpResponse::Ok().finish();
+        }
+    }
+    HttpResponse::Ok().finish()
 }
 
 #[post("/login/")]
@@ -43,6 +65,7 @@ async fn login_post(
     let is_user = User::check(&mut conn, &form.name, &form.password);
     if is_user {
         let _ = session.insert("loggedin", "true");
+        let _ = session.insert("username", &form.name);
     } else {
         session.purge();
     }

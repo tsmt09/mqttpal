@@ -1,0 +1,11 @@
+<tr class="#userRow">
+  <th scope="row">{{ user.id }}</th>
+  <td>{{ user.name }}</td>
+  <td>
+    {{ user.email.clone().unwrap_or("".into()) }}
+  </td>
+  <td>
+    ****
+  </td>
+  <td><button type="button" class="btn btn-danger" hx-delete="/user/{{ user.id }}" hx-target="closest tr" hx-swap="outerHTML"><img alt="delete" src="/svg/feather/trash.svg" /></button></td>
+</tr>

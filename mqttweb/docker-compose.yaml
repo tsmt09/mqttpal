@@ -1,0 +1,19 @@
+version: '3'
+services:
+  mqttweb:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.dev
+      args:
+        INIT_USER_NAME: super_compose
+    ports:
+      - "8081:8081"
+    environment:
+      RUST_LOG: DEBUG
+      SESSION_KEY: "32YklSvWJ9ebZXYlrdijmxvB8nMwHH82S11eleqR9NKcJEVb9t1srfqUxe2VMnhd80Wv/45ViGYKQcyf/SyKwg=="
+      SESSION_KEY_SEC: "32YklSvWJ9ebZXYlrdijmxvB8nMwHH82S11eleqR9NI="
+    volumes:
+      - ./src:/app/mqttweb/src
+      - ./migrations:/app/mqttweb/migrations
+      - ./templates:/app/mqttweb/templates
+      - ./static:/app/mqttweb/static

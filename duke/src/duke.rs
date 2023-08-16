@@ -1,4 +1,4 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 /// A node in the graph
 #[derive(Serialize)]
@@ -10,31 +10,29 @@ pub struct Node<M: Serialize> {
     /// The output vector of the node
     pub output: Vec<i32>,
     /// The actor of the node
-    pub actor: Box<dyn SerializableAct<M>>
+    pub actor: Box<dyn SerializableAct<M>>,
 }
 
 #[derive(Serialize, Deserialize)]
 enum Serializers {
     Toml,
-    Json
+    Json,
 }
 
-pub trait Act<M>
-{
+pub trait Act<M> {
     fn act(&self, msg: M) -> M;
 }
 
-pub trait SerializableAct<M: Serialize>: erased_serde::Serialize + Act<M> {}
+pub trait SerializableAct<M>: erased_serde::Serialize + Act<M> {}
 
 erased_serde::serialize_trait_object!(<T> SerializableAct<T> where T: Serialize);
 
 #[derive(Serialize, Deserialize)]
 struct Debug {
-    ser: Serializers
+    ser: Serializers,
 }
 
-impl<M: Serialize> Act<M> for Debug 
-    {
+impl<M: Serialize> Act<M> for Debug {
     fn act(&self, msg: M) -> M {
         let mut toml = String::new();
         let serializer = toml::Serializer::new(&mut toml);
@@ -44,12 +42,15 @@ impl<M: Serialize> Act<M> for Debug
     }
 }
 
-mod test {
+#[cfg(test)]
+mod tests {
     use super::*;
-    
+
     #[test]
     fn test_debug() {
-        let a = Debug { ser: Serializers::Toml };
+        let a = Debug {
+            ser: Serializers::Toml,
+        };
         let json = serde_json::json!({"a": {"b": ["test", "test"]}});
         let json2 = a.act(json.clone());
         assert_eq!(json, json2);

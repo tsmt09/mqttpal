@@ -1,12 +1,12 @@
 use actix_web::{
     dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform},
-    http::header::{Header, HeaderMap, HeaderName, HeaderValue},
-    Error, FromRequest, HttpMessage,
+    http::header::{HeaderMap, HeaderName, HeaderValue},
+    Error, HttpMessage,
 };
 use futures_util::future::LocalBoxFuture;
 use std::future::{ready, Ready};
 
-#[allow(unused_variables)]
+#[allow(unused_variables, dead_code)]
 #[derive(Default, Debug)]
 pub struct HtmxHeaders {
     // request headers
@@ -32,6 +32,7 @@ pub struct HtmxHeaders {
     trigger_after_swap: Option<String>,
 }
 
+#[allow(dead_code)]
 impl HtmxHeaders {
     fn from_headers_map(map: &HeaderMap) -> Self {
         HtmxHeaders {
@@ -98,67 +99,67 @@ impl HtmxHeaders {
         if let Some(location) = &self.location {
             map.insert(
                 HeaderName::from_static("hx-location"),
-                HeaderValue::from_str(&location).unwrap(),
+                HeaderValue::from_str(location).unwrap(),
             );
         }
         if let Some(push_url) = &self.push_url {
             map.insert(
                 HeaderName::from_static("hx-push-url"),
-                HeaderValue::from_str(&push_url).unwrap(),
+                HeaderValue::from_str(push_url).unwrap(),
             );
         }
         if let Some(redirect) = &self.redirect {
             map.insert(
                 HeaderName::from_static("hx-redirect"),
-                HeaderValue::from_str(&redirect).unwrap(),
+                HeaderValue::from_str(redirect).unwrap(),
             );
         }
         if let Some(refresh) = &self.refresh {
             map.insert(
                 HeaderName::from_static("hx-refresh"),
-                HeaderValue::from_str(&refresh).unwrap(),
+                HeaderValue::from_str(refresh).unwrap(),
             );
         }
         if let Some(replace_url) = &self.replace_url {
             map.insert(
                 HeaderName::from_static("hx-replace-url"),
-                HeaderValue::from_str(&replace_url).unwrap(),
+                HeaderValue::from_str(replace_url).unwrap(),
             );
         }
         if let Some(reswap) = &self.reswap {
             map.insert(
                 HeaderName::from_static("hx-reswap"),
-                HeaderValue::from_str(&reswap).unwrap(),
+                HeaderValue::from_str(reswap).unwrap(),
             );
         }
         if let Some(reselect) = &self.reselect {
             map.insert(
                 HeaderName::from_static("hx-reselect"),
-                HeaderValue::from_str(&reselect).unwrap(),
+                HeaderValue::from_str(reselect).unwrap(),
             );
         }
         if let Some(retarget) = &self.retarget {
             map.insert(
                 HeaderName::from_static("hx-retarget"),
-                HeaderValue::from_str(&retarget).unwrap(),
+                HeaderValue::from_str(retarget).unwrap(),
             );
         }
         if let Some(response_trigger) = &self.response_trigger {
             map.insert(
                 HeaderName::from_static("hx-trigger"),
-                HeaderValue::from_str(&response_trigger).unwrap(),
+                HeaderValue::from_str(response_trigger).unwrap(),
             );
         }
         if let Some(trigger_after_settle) = &self.trigger_after_settle {
             map.insert(
                 HeaderName::from_static("hx-trigger-after-settle"),
-                HeaderValue::from_str(&trigger_after_settle).unwrap(),
+                HeaderValue::from_str(trigger_after_settle).unwrap(),
             );
         }
         if let Some(trigger_after_swap) = &self.trigger_after_swap {
             map.insert(
                 HeaderName::from_static("hx-trigger-after-swap"),
-                HeaderValue::from_str(&trigger_after_swap).unwrap(),
+                HeaderValue::from_str(trigger_after_swap).unwrap(),
             );
         }
     }

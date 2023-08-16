@@ -1,10 +1,10 @@
 use crate::middleware::htmx::HtmxHeaders;
-use crate::models::authorized::Authorized;
+use crate::middleware::login_guard::LoginGuard;
+use crate::middleware::user_session::UserSession;
 use actix_files::NamedFile;
 use actix_session::{storage::CookieSessionStore, Session, SessionMiddleware};
 use actix_web::{
-    cookie::Key, get, web, App, HttpMessage, HttpRequest, HttpResponse, HttpServer,
-    Responder,
+    cookie::Key, get, web, App, HttpMessage, HttpRequest, HttpResponse, HttpServer, Responder,
 };
 use askama::Template;
 use base64::Engine;
@@ -18,6 +18,8 @@ mod login;
 mod middleware;
 mod models;
 pub mod schema;
+mod user;
+mod users;
 
 pub type DbPool = diesel::r2d2::Pool<diesel::r2d2::ConnectionManager<SqliteConnection>>;
 
@@ -48,25 +50,42 @@ struct CliArgs {
 #[template(path = "dashboard.html")]
 struct DashboardTemplate {
     hx: bool,
+    user: Option<String>,
 }
 
 #[get("/")]
-async fn index() -> impl Responder {
-    let local_login = login::LoginTemplate { hx: false };
+async fn index(usession: UserSession) -> impl Responder {
+    if usession.username.is_some() {
+        let template = DashboardTemplate {
+            hx: false,
+            user: usession.username,
+        };
+        return HttpResponse::Ok().body(template.render().unwrap());
+    }
+    let local_login = login::LoginTemplate {
+        hx: false,
+        user: usession.username,
+    };
     HttpResponse::Ok().body(local_login.render().unwrap())
 }
 
 #[get("/")]
-async fn dashboard(req: HttpRequest, _: Authorized) -> impl Responder {
+async fn dashboard(req: HttpRequest, _: LoginGuard, usession: UserSession) -> impl Responder {
     let template = if let Some(htmx) = req.extensions_mut().get_mut::<HtmxHeaders>() {
         log::debug!("Is htmx req? {}", htmx.request());
         if htmx.request() {
             log::debug!("Set redirect!");
             htmx.set_push_url("/dashboard/");
         }
-        DashboardTemplate { hx: htmx.request() }
+        DashboardTemplate {
+            hx: htmx.request(),
+            user: usession.username,
+        }
     } else {
-        DashboardTemplate { hx: false }
+        DashboardTemplate {
+            hx: false,
+            user: usession.username,
+        }
     };
     HttpResponse::Ok().body(template.render().unwrap())
 }
@@ -108,19 +127,19 @@ async fn main() -> std::io::Result<()> {
     match cli.command {
         CliCommands::CreateSessionKey => {
             create_session_key();
-            return Ok(());
+            Ok(())
         }
         CliCommands::CreateUser(user) => {
             let user = models::user::NewUser {
-                name: &user.name,
-                password: &user.password,
-                email: user.email.as_deref(),
+                name: user.name,
+                password: user.password,
+                email: user.email,
             };
             let mut conn = pool.get().expect("cannot get connection from pool!");
             let result = user.insert(&mut conn);
             log::info!("Inserted User: {result:?}");
             // do some serve
-            return Ok(());
+            Ok(())
         }
         CliCommands::Serve => {
             HttpServer::new(move || {
@@ -146,6 +165,10 @@ async fn main() -> std::io::Result<()> {
                     .service(actix_files::Files::new("/svg/", "static/svg/"))
                     .service(login::login)
                     .service(login::login_post)
+                    .service(login::logout)
+                    .service(users::get)
+                    .service(user::delete_user)
+                    .service(user::post)
                     .service(favicon)
                     .service(index)
                 // guarded resources

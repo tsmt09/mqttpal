@@ -1,0 +1,40 @@
+{% if !hx %}
+{% include "top.html" %}
+{% endif %}
+
+<table class="table">
+  <thead>
+    <tr>
+      <th scope="col">#</th>
+      <th scope="col">Name</th>
+      <th scope="col">Email</th>
+      <th scope="col">Password</th>
+      <th scope="col"></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for user in users %}
+    {% include "user_row.html" %} 
+    {% endfor %}
+    <form hx-post="/user/" hx-target="this" hx-swap="beforebegin">
+      <tr>
+        <td>
+        </td>
+        <td>
+          <input type="name" class="form-control" id="name" aria-describedby="nameHelp" placeholder="Username" name="name">
+        </td>
+        <td>
+          <input type="email" class="form-control" id="email" aria-describedby="emailHelp" placeholder="E-Mail" name="email">
+        </td>
+        <td>
+          <input type="password" class="form-control" id="password" aria-describedby="passHelp" placeholder="Password" name="password">
+        </td>
+        <td><button type="submit" class="btn btn-success" ><img alt="delete" src="/svg/feather/plus.svg" /></button></td>
+      </tr>
+    </form>
+  </tbody>
+</table>
+
+{% if !hx %}
+{% include "bottom.html" %}
+{% endif %}
