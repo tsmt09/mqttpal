@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     middleware::{htmx::HtmxHeaders, login_guard::LoginGuard},
-    models::user::{NewUser, User},
+    models::{user::{NewUser, User}, role::Role},
 };
 
 #[delete("/user/{id}")]
@@ -43,6 +43,7 @@ impl From<UserForm> for NewUser {
 #[template(path = "user_row.html")]
 struct UserRowTemplate {
     user: User,
+    roles: Vec<Role>
 }
 
 #[post("/user/")]
@@ -57,7 +58,7 @@ async fn post(
     let user = new_user.insert(&mut conn);
     if let Some(htmx) = req.extensions_mut().get_mut::<HtmxHeaders>() {
         if htmx.request() {
-            let template = UserRowTemplate { user }.render().unwrap();
+            let template = UserRowTemplate { user, roles: vec![] }.render().unwrap();
             return HttpResponse::Ok().body(template);
         }
     }

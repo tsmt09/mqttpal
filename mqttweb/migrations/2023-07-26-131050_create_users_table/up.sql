@@ -1,7 +1,7 @@
--- Your SQL goes here
-CREATE TABLE users (
-	id INTEGER NOT NULL PRIMARY KEY,
-	name VARCHAR NOT NULL,
-	password VARCHAR NOT NULL,
-	email VARCHAR
+CREATE TABLE "users" (
+	"id"	INTEGER NOT NULL,
+	"name"	VARCHAR NOT NULL UNIQUE,
+	"password"	VARCHAR NOT NULL,
+	"email"	VARCHAR,
+	PRIMARY KEY("id" AUTOINCREMENT)
 );
