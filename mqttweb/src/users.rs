@@ -3,7 +3,7 @@ use askama::Template;
 
 use crate::{
     middleware::{htmx::HtmxHeaders, login_guard::LoginGuard, user_session::UserSession},
-    models::{user::User, role::Role},
+    models::user::User,
 };
 
 #[derive(Template)]
@@ -11,7 +11,7 @@ use crate::{
 pub struct UserListTemplate {
     hx: bool,
     user: Option<String>,
-    pub users: Vec<(User, Vec<Role>)>,
+    pub users: Vec<User>,
 }
 
 #[get("/users/")]
@@ -22,7 +22,7 @@ async fn get(
     db: web::Data<crate::DbPool>,
 ) -> impl Responder {
     let mut conn = db.get().expect("no connection available");
-    let users = User::list_with_roles(&mut conn);
+    let users = User::list(&mut conn);
     let template = if let Some(htmx) = req.extensions_mut().get_mut::<HtmxHeaders>() {
         log::debug!("Is htmx req? {}", htmx.request());
         if htmx.request() {

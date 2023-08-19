@@ -7,10 +7,5 @@
   <td>
     ****
   </td>
-  <td>
-    {% for role in roles %}
-      {{ role.name }}
-    {% endfor %}
-  </td>
   <td><button type="button" class="btn btn-danger" hx-delete="/user/{{ user.id }}" hx-target="closest tr" hx-swap="outerHTML"><img alt="delete" src="/svg/feather/trash.svg" /></button></td>
 </tr>

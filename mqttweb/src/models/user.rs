@@ -1,7 +1,6 @@
 use diesel::prelude::*;
-use crate::models::role::Role;
 
-#[derive(Queryable, Selectable, Insertable, Debug, Clone)]
+#[derive(Queryable, Selectable, Insertable, Debug)]
 #[diesel(table_name = crate::schema::users)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 pub struct User {
@@ -37,26 +36,6 @@ impl User {
             .load(conn)
             .expect("Error loading users!")
     }
-    pub fn list_with_roles(conn: &mut diesel::SqliteConnection) -> Vec<(User, Vec<Role>)> {
-        use crate::schema::roles::dsl::*;
-        use crate::schema::user_role::dsl::*;
-        use crate::schema::users::dsl::*;
-        let res = users
-            .select(User::as_select())
-            .load::<User>(conn)
-            .expect("Error loading users!");
-        let mut users_with_roles = Vec::new();
-        for user in res {
-            let res_roles = user_role
-                .inner_join(roles)
-                .filter(user_id.eq(user.id))
-                .select(Role::as_select())
-                .load(conn)
-                .expect("Error loading roles!");
-            users_with_roles.push((user, res_roles));
-        }
-        users_with_roles
-    }
     pub fn delete(conn: &mut diesel::SqliteConnection, user_id: i32) -> bool {
         use crate::schema::users::dsl::*;
         log::info!("Deleting user with id: {}", user_id);
@@ -65,34 +44,6 @@ impl User {
             Ok(ok) => ok > 0,
             Err(e) => {
                 log::error!("Error deleting user: {:?}", e);
-                false
-            }
-        }
-    }
-    pub fn add_role(conn: &mut diesel::SqliteConnection, uid: i32, rid: i32) -> bool {
-        use crate::schema::user_role::dsl::*;
-        log::info!("Adding role {} to user {}", rid, uid);
-        let res = diesel::insert_into(user_role)
-            .values((user_id.eq(uid), role_id.eq(rid)))
-            .execute(conn);
-        match res {
-            Ok(ok) => ok > 0,
-            Err(e) => {
-                log::error!("Error adding role to user: {:?}", e);
-                false
-            }
-        }
-    }
-    fn remove_role(conn: &mut diesel::SqliteConnection, uid: i32, rid: i32) -> bool {
-        use crate::schema::user_role::dsl::*;
-        log::info!("Removing role {} from user {}", rid, uid);
-        let res = diesel::delete(user_role)
-            .filter(user_id.eq(uid).and(role_id.eq(rid)))
-            .execute(conn);
-        match res {
-            Ok(ok) => ok > 0,
-            Err(e) => {
-                log::error!("Error removing role from user: {:?}", e);
                 false
             }
         }

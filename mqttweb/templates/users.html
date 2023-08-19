@@ -13,9 +13,7 @@
     </tr>
   </thead>
   <tbody>
-    {% for tuple in users %}
-    {% set user = tuple.0.clone() %}
-    {% set roles = tuple.1.clone() %}
+    {% for user in users %}
     {% include "user_row.html" %} 
     {% endfor %}
     <form hx-post="/user/" hx-target="this" hx-swap="beforebegin">

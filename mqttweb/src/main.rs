@@ -28,19 +28,6 @@ enum CliCommands {
     Serve,
     CreateSessionKey,
     CreateUser(CreateUserArgs),
-    CreateRole(CreateRoleArgs),
-    AddUserRole(AddUserRoleArgs),
-}
-
-#[derive(Args, Debug)]
-struct AddUserRoleArgs {
-    user_id: i32,
-    role_id: i32,
-}
-
-#[derive(Args, Debug)]
-struct CreateRoleArgs {
-    name: String,
 }
 
 #[derive(Args, Debug)]
@@ -151,27 +138,6 @@ async fn main() -> std::io::Result<()> {
             let mut conn = pool.get().expect("cannot get connection from pool!");
             let result = user.insert(&mut conn);
             log::info!("Inserted User: {result:?}");
-            // do some serve
-            Ok(())
-        }
-        CliCommands::CreateRole(role) => {
-            let role = models::role::NewRole { name: role.name };
-            let mut conn = pool.get().expect("cannot get connection from pool!");
-            let result = role.insert(&mut conn);
-            log::info!("Inserted User: {result:?}");
-            // do some serve
-            Ok(())
-        }
-        CliCommands::AddUserRole(args) => {
-            let mut conn = pool.get().expect("cannot get connection from pool!");
-            models::user::User::add_role(&mut conn, args.user_id, args.role_id);
-            log::info!(
-                "Added User->Role Relation: {}, {}",
-                args.user_id,
-                args.role_id
-            );
-            let roles = models::user::User::list_with_roles(&mut conn);
-            log::debug!("Users with Roles: {:?}", roles);
             // do some serve
             Ok(())
         }
