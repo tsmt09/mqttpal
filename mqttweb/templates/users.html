@@ -2,13 +2,14 @@
 {% include "top.html" %}
 {% endif %}
 
-<table class="table">
+<table role="grid">
   <thead>
     <tr>
       <th scope="col">#</th>
       <th scope="col">Name</th>
       <th scope="col">Email</th>
       <th scope="col">Password</th>
+      <th scope="col">Role</th>
       <th scope="col"></th>
     </tr>
   </thead>
@@ -21,15 +22,21 @@
         <td>
         </td>
         <td>
-          <input type="name" class="form-control" id="name" aria-describedby="nameHelp" placeholder="Username" name="name">
+          <input type="name" id="name" aria-describedby="nameHelp" placeholder="Username" name="name">
         </td>
         <td>
-          <input type="email" class="form-control" id="email" aria-describedby="emailHelp" placeholder="E-Mail" name="email">
+          <input type="email" id="email" aria-describedby="emailHelp" placeholder="E-Mail" name="email">
         </td>
         <td>
-          <input type="password" class="form-control" id="password" aria-describedby="passHelp" placeholder="Password" name="password">
+          <input type="password" id="password" aria-describedby="passHelp" placeholder="Password" name="password">
         </td>
-        <td><button type="submit" class="btn btn-success" ><img alt="delete" src="/svg/feather/plus.svg" /></button></td>
+        <td>
+          <select id="role" name="role_id">
+            <option value="1" selected>User</option>
+            <option value="0">Admin</option>
+          </select>
+        </td>
+        <td><button type="submit">Add</button></td>
       </tr>
     </form>
   </tbody>

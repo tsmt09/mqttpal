@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     middleware::{htmx::HtmxHeaders, login_guard::LoginGuard},
-    models::user::{NewUser, User},
+    models::user::{NewUser, Role, User},
 };
 
 #[delete("/user/{id}")]
@@ -27,6 +27,7 @@ struct UserForm {
     name: String,
     password: String,
     email: Option<String>,
+    role_id: Option<i32>,
 }
 
 impl From<UserForm> for NewUser {
@@ -35,6 +36,7 @@ impl From<UserForm> for NewUser {
             name: form.name,
             password: form.password,
             email: form.email,
+            role_id: form.role_id.unwrap_or(Role::User as i32),
         }
     }
 }

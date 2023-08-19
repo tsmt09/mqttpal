@@ -1,6 +1,7 @@
 use crate::middleware::htmx::HtmxHeaders;
 use crate::middleware::login_guard::LoginGuard;
 use crate::middleware::user_session::UserSession;
+use crate::models::user::Role;
 use actix_files::NamedFile;
 use actix_session::{storage::CookieSessionStore, Session, SessionMiddleware};
 use actix_web::{
@@ -35,6 +36,7 @@ struct CreateUserArgs {
     name: String,
     password: String,
     email: Option<String>,
+    role_id: Option<i32>,
 }
 
 #[derive(Parser, Debug)]
@@ -134,6 +136,7 @@ async fn main() -> std::io::Result<()> {
                 name: user.name,
                 password: user.password,
                 email: user.email,
+                role_id: user.role_id.unwrap_or(Role::Admin as i32),
             };
             let mut conn = pool.get().expect("cannot get connection from pool!");
             let result = user.insert(&mut conn);

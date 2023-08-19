@@ -1,6 +1,21 @@
 use diesel::prelude::*;
 
-#[derive(Queryable, Selectable, Insertable, Debug)]
+pub enum Role {
+    Admin = 0,
+    User = 1,
+}
+
+impl From<i32> for Role {
+    fn from(i: i32) -> Self {
+        match i {
+            0 => Role::Admin,
+            1 => Role::User,
+            _ => panic!("Unknown role: {}", i),
+        }
+    }
+}
+
+#[derive(Queryable, Selectable, Debug)]
 #[diesel(table_name = crate::schema::users)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 pub struct User {
@@ -8,6 +23,7 @@ pub struct User {
     pub name: String,
     pub email: Option<String>,
     pub password: String,
+    pub role_id: i32,
 }
 
 impl User {
@@ -57,6 +73,7 @@ pub struct NewUser {
     pub name: String,
     pub email: Option<String>,
     pub password: String,
+    pub role_id: i32,
 }
 
 impl NewUser {

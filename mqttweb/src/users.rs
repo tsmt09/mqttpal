@@ -3,7 +3,7 @@ use askama::Template;
 
 use crate::{
     middleware::{htmx::HtmxHeaders, login_guard::LoginGuard, user_session::UserSession},
-    models::user::User,
+    models::user::{User, Role}
 };
 
 #[derive(Template)]

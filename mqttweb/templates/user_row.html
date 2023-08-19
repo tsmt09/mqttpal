@@ -7,5 +7,13 @@
   <td>
     ****
   </td>
-  <td><button type="button" class="btn btn-danger" hx-delete="/user/{{ user.id }}" hx-target="closest tr" hx-swap="outerHTML"><img alt="delete" src="/svg/feather/trash.svg" /></button></td>
+  <td>
+    {% match user.role_id.into() %}
+      {% when Role::Admin %}
+        Admin
+      {% when Role::User %}
+        User
+    {% endmatch %}
+  </td>
+  <td><button type="button" hx-delete="/user/{{ user.id }}" hx-target="closest tr" hx-swap="outerHTML">Delete</button></td>
 </tr>
