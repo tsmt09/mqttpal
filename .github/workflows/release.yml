@@ -1,0 +1,35 @@
+name: Release Build and Push Docker Image
+
+on:
+  release:
+    types: [created]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+
+      - name: Clippy and Format
+        run: |
+          cargo clippy -- -D warnings
+          cargo fmt -- --check
+
+      - name: Release Build
+        run: cargo build --release
+
+      - name: Build Docker Image
+        run: docker buildx build ./docker -t ghcr.io/${{ github.repository }}:${{ github.event.release.tag_name }} --file ./docker/Dockerfile.prod --push
+        env:
+          CR_PAT: ${{ secrets.GITHUB_TOKEN }}

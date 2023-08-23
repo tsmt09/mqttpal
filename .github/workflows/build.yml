@@ -24,7 +24,6 @@ jobs:
 
       - name: Clippy and Format
         run: |
-          cargo install cargo-clippy
           cargo clippy -- -D warnings
           cargo fmt -- --check
 
