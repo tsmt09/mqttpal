@@ -24,6 +24,7 @@ COPY ./src ./src
 COPY ./templates ./templates
 COPY ./migrations ./migrations
 COPY ./static ./static
+COPY ./docker ./docker
 
 # Build the actual application
 RUN cargo build --release
@@ -51,7 +52,7 @@ COPY --from=builder /app/templates ./templates
 COPY --from=builder /app/migrations ./migrations
 COPY --from=builder /app/static ./static
 
-COPY ./docker/entrypoint.sh .
+COPY --from=builder /app/docker/entrypoint.sh entrypoint.sh
 RUN chmod +x entrypoint.sh
 
 # Expose the port that your Actix service will listen on
