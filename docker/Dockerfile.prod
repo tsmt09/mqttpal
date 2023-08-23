@@ -51,7 +51,7 @@ COPY --from=builder /app/templates ./templates
 COPY --from=builder /app/migrations ./migrations
 COPY --from=builder /app/static ./static
 
-COPY docker/entrypoint.sh .
+COPY ./docker/entrypoint.sh .
 RUN chmod +x entrypoint.sh
 
 # Expose the port that your Actix service will listen on

@@ -32,4 +32,4 @@ jobs:
       - name: Build Docker Image
         run: docker buildx build ./docker -t ghcr.io/${{ github.repository }}:${{ github.event.release.tag_name }} --file ./docker/Dockerfile.prod --push
         env:
-          CR_PAT: ${{ secrets.GITHUB_TOKEN }}
+          CR_PAT: ${{ secrets.GHCR_PAT }}
