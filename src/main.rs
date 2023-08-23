@@ -10,7 +10,9 @@ use base64::Engine;
 use clap::Args;
 use clap::Parser;
 use clap::Subcommand;
+use diesel::sqlite::Sqlite;
 use diesel::SqliteConnection;
+use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 use middleware::htmx::Htmx;
 
 mod login;
@@ -24,10 +26,13 @@ mod users;
 
 pub type DbPool = diesel::r2d2::Pool<diesel::r2d2::ConnectionManager<SqliteConnection>>;
 
+pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
+
 #[derive(Subcommand, Debug)]
 enum CliCommands {
     Serve,
     CreateSessionKey,
+    Migrate,
     CreateInitUser(CreateInitUserArgs),
     CreateClient(CreateClientArgs),
 }
@@ -74,6 +79,14 @@ async fn favicon(_session: Session) -> impl Responder {
 
 fn create_session_key() -> Key {
     Key::generate()
+}
+
+fn run_migrations(
+    connection: &mut impl MigrationHarness<Sqlite>,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>> {
+    log::info!("running migrations ...");
+    connection.run_pending_migrations(MIGRATIONS)?;
+    Ok(())
 }
 
 fn get_session_key() -> Key {
@@ -140,6 +153,11 @@ async fn main() -> std::io::Result<()> {
             let result = new_client.insert(&mut conn);
             log::info!("Inserted Client: {result:?}");
             // do some serve
+            Ok(())
+        }
+        CliCommands::Migrate => {
+            let mut conn = pool.get().expect("cannot get connection from pool!");
+            run_migrations(&mut conn).expect("migrations have not been run successfully");
             Ok(())
         }
         CliCommands::Serve => {

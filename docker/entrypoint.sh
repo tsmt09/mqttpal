@@ -1,4 +1,5 @@
 #!/bin/sh
+
 set -e
 
 # Set default values for user creation if not provided
@@ -6,8 +7,11 @@ set -e
 : ${INIT_USER_PASSWORD:=dev}
 : ${INIT_USER_EMAIL:=super@example.com}
 
+# diesel run migrations
+mqttpal migrate
+
 # Run the mqttpal create user command with provided environment variables
-/app/mqttpal create-init-user "$INIT_USER_NAME" "$INIT_USER_PASSWORD" "$INIT_USER_EMAIL"
+mqttpal create-init-user "$INIT_USER_NAME" "$INIT_USER_PASSWORD" "$INIT_USER_EMAIL"
 
 # Start the mqttpal service
-/app/mqttpal serve
+exec mqttpal serve

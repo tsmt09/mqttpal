@@ -1,0 +1,14 @@
+version: '3'
+services:
+  mqttweb:
+    image: ghcr.io/tsmt09/mqttpal:latest
+    ports:
+      - "8080:8080"
+    environment:
+      RUST_LOG: INFO
+      SESSION_KEY: "42YklSvWJ9ebZXYlrdijmxvB8nMwHH82S11eleqR9NKcJEVb9t1srfqUxe2VMnhd80Wv/45ViGYKQcyf/SyKwg==" # CHANGE THIS
+      SESSION_KEY_SEC: "42YklSvWJ9ebZXYlrdijmxvB8nMwHH82S11eleqR9NI=" # CHANGE THIS
+      DATABASE_URL: "sqlite://./db/mqttweb.db"
+      RUST_BACKTRACE: full
+    volumes:
+      - ./db:/app/db:rw

@@ -74,7 +74,7 @@ async fn post(
     if let Some(htmx) = req.extensions_mut().get_mut::<HtmxHeaders>() {
         if htmx.request() {
             if is_user {
-                htmx.set_redirect("/dashboard/");
+                htmx.set_redirect("/");
                 HttpResponse::Ok().finish()
             } else {
                 htmx.set_retarget("#form-errors");

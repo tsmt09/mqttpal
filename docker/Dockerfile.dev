@@ -17,7 +17,7 @@ RUN cargo install diesel_cli --no-default-features --features sqlite
 
 # Create a new empty cargo project
 RUN cargo new --bin mqttpal
-WORKDIR /app/mqttpal#
+WORKDIR /app/mqttpal
 
 # Copy over the cargo.toml file
 COPY Cargo.toml ./
