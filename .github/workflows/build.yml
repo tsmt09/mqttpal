@@ -28,7 +28,7 @@ jobs:
           cargo fmt -- --check
 
       - name: Build Docker Image
-        run: docker buildx build ./docker -t ghcr.io/${{ github.repository }}:latest --file ./docker/Dockerfile.prod --push
+        run: docker buildx build . -t ghcr.io/${{ github.repository }}:latest --file ./docker/Dockerfile.prod --push
         env:
           CR_PAT: ${{ secrets.GITHUB_TOKEN }}
 
