@@ -1,0 +1,24 @@
+<div class="f-switch justify-content:start" id="users">
+{% for user in users %}
+{% include "user_card.html" %} 
+{% endfor %}
+</div>
+
+<div class="box">
+  <form hx-post="/user/" hx-target="#users" hx-swap="afterend">
+    <label for="name">Username</label>
+    <input id="name" name="name">
+    <label for="email">E-Mail</label>
+    <input type="email" id="email" name="email">
+    <label for="password">Password</label>
+    <input type="password" id="password" aria-describedby="passHelp" name="password">
+    <label for="role">Role</label>
+    <select id="role" name="role_id">
+      <option value="1" selected>User</option>
+      <option value="0">Admin</option>
+    </select>
+    <div class="float:right">
+      <button type="submit">Add</button>
+    </div>
+  </form>
+</div>

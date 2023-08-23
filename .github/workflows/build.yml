@@ -1,0 +1,35 @@
+name: Build and push development docker image
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+
+      - name: Clippy and Format
+        run: |
+          cargo install cargo-clippy
+          cargo clippy -- -D warnings
+          cargo fmt -- --check
+
+      - name: Build Docker Image
+        run: docker buildx build ./docker -t ghcr.io/${{ github.repository }}:latest --file ./docker/Dockerfile.prod --push
+        env:
+          CR_PAT: ${{ secrets.GITHUB_TOKEN }}
+

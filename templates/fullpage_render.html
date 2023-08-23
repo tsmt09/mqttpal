@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>MQTTPal</title>
+  <link rel="stylesheet" href="https://unpkg.com/missing.css@1.0.9/dist/missing.min.css">
+  <script src="/js/htmx.min.js"></script>
+</head>
+
+<body>
+  <header class="navbar">
+    <nav>
+      <ul role="list">
+        <li>
+          MQTTPal
+        </li>
+        {% match user %}
+        {% when Some (val) %}
+        <li>
+          <a hx-get="/users/" hx-target="#mainWindow" hx-push-url="true">Users</a>
+        </li>
+        <li>
+          <a hx-get="/mqtt_clients/" hx-target="#mainWindow" hx-push-url="true">MQTT Clients</a>
+        </li>
+        <li>
+          <a hx-post="/logout/" hx-push-url="true">Logout ({{ val }})</a>
+        </li>
+        {% else %}
+        <li>
+          <a hx-get="/login/" hx-target="#mainWindow" hx-push-url="true">Login</a>
+        </li>
+        {% endmatch %}
+      </ul>
+    </nav>
+  </header>
+  <main>
+    <div class="container" id="mainWindow">
+      {{ body|safe }}
+    </div>
+  </main>
+</body>
+
+</html>

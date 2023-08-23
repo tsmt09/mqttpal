@@ -1,0 +1,61 @@
+# Use the official Rust image as the base image
+FROM rust:1.71-bookworm as builder
+
+ENV DATABASE_URL=sqlite://mqttpal.db
+
+# Install libopenssl and libsqlite3 for building
+RUN apt-get update && \
+    apt-get install -y libssl-dev libsqlite3-dev
+
+# install diesel_cli
+RUN cargo install diesel_cli --no-default-features --features sqlite
+
+# Set the working directory in the container
+WORKDIR /app
+
+# Copy the Cargo.toml and Cargo.lock files to the container
+COPY Cargo.toml Cargo.lock ./
+
+# Build a dummy project to cache dependencies
+RUN mkdir src && echo "fn main() {}" > src/main.rs && cargo build --release
+
+# Copy the rest of the application code
+COPY ./src ./src
+COPY ./templates ./templates
+COPY ./migrations ./migrations
+COPY ./static ./static
+
+# Build the actual application
+RUN cargo build --release
+RUN diesel migration run
+
+# Create a new image for the runtime environment
+FROM debian:bookworm-slim
+ENV DATABASE_URL=sqlite://mqttpal.db
+ENV RUST_LOG=info
+
+# Install libopenssl and libsqlite3 in the runtime environment
+RUN apt-get update && \
+    apt-get install -y libssl-dev libsqlite3-0 && \
+    rm -rf /var/lib/apt/lists/*
+
+# Set the working directory in the container
+WORKDIR /app
+
+# Copy the binary from the builder stage
+COPY --from=builder /app/target/release/mqttpal .
+COPY --from=builder /app/mqttpal.db .
+
+# Copy additional folders needed for runtime
+COPY --from=builder /app/templates ./templates
+COPY --from=builder /app/migrations ./migrations
+COPY --from=builder /app/static ./static
+
+COPY docker/entrypoint.sh .
+RUN chmod +x entrypoint.sh
+
+# Expose the port that your Actix service will listen on
+EXPOSE 8080
+
+# Command to run your Actix service
+CMD ["./entrypoint.sh"]

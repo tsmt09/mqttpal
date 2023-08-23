@@ -1,6 +1,23 @@
-[workspace]
+[package]
+name = "mqttpal"
+version = "0.1.0"
+edition = "2021"
 
-members = [
-    "mqttweb",
-    "duke"
-]
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+log = "0.4.19"
+pretty_env_logger = "0.5.0"
+actix-web = "4.3.1"
+actix-files = "0.6.2"
+actix-session = { version = "0.7.2", features = ["cookie-session"] }
+base64 = "0.21.2"
+futures-util = "0.3.28"
+askama = "0.12.0"
+dotenv = "0.15.0"
+tokio = "1.32.0"
+serde = { version = "1.0.171", features = ["derive"] }
+diesel = { version = "2.1.0", features = ["sqlite", "chrono", "returning_clauses_for_sqlite_3_35", "r2d2"] }
+chrono = "0.4.26"
+clap = { version = "4.3.19", features = ["derive"] }
+rumqttc = { version = "0.22.0", features = ["url"] }
