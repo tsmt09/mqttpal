@@ -1,11 +1,21 @@
-<div class="f-switch justify-content:start" id="clients">
+<table>
+  <thead>
+  <tr>
+    <th>id</th>
+    <th>Name</th>
+    <th>URL</th>
+    <th></th>
+  </thead>
+  <tbody id="clients">
   {% for mqtt_client in mqtt_clients %}
-  {% include "mqtt_client_card.html" %} 
+  {% include "mqtt_client_row.html" %} 
   {% endfor %}
-</div>
+  </tbody>
+</table>
+
 
 <div class="box">
-  <form hx-post="/mqtt_client/" hx-target="#clients" hx-swap="afterend">
+  <form hx-post="/mqtt_client/" hx-target="#mainWindow">
     <label for="name">Name</label>
     <input id="name" name="name">
     <label for="url">URL</label>

@@ -28,7 +28,7 @@ impl MqttClientManager {
         }
     }
     pub async fn register_client(
-        &mut self,
+        &self,
         client_id: String,
         mqtt_url: String,
     ) -> Result<(), Box<dyn std::error::Error>> {
@@ -56,6 +56,14 @@ impl MqttClientManager {
         let client = MqttClient { client, tx };
         self.clients.lock().await.insert(client_id, client);
         Ok(())
+    }
+    pub async fn unregister_client(&self, client_id: String) {
+        log::info!("Unregistering client: {}", client_id);
+        let mut clients = self.clients.lock().await;
+        let client = clients.remove(&client_id);
+        if let Some(client) = client {
+            client.client.disconnect().await.unwrap();
+        }
     }
     #[allow(dead_code)]
     pub async fn subscribe(

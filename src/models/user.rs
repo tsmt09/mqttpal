@@ -15,7 +15,7 @@ impl From<i32> for Role {
     }
 }
 
-#[derive(Queryable, Selectable, Debug)]
+#[derive(Queryable, Selectable, AsChangeset, Debug)]
 #[diesel(table_name = crate::schema::users)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 pub struct User {
@@ -63,6 +63,31 @@ impl User {
                 false
             }
         }
+    }
+    pub fn get(conn: &mut diesel::SqliteConnection, user_id: i32) -> Option<User> {
+        use crate::schema::users::dsl::*;
+        let res = users
+            .filter(id.eq(user_id))
+            .select(User::as_select())
+            .load(conn);
+        match res {
+            Ok(ok) => ok.into_iter().next(),
+            Err(e) => {
+                log::error!("Error querying user: {:?}", e);
+                None
+            }
+        }
+    }
+    pub fn update(
+        conn: &mut diesel::SqliteConnection,
+        user_id: i32,
+        user: &User,
+    ) -> Result<User, diesel::result::Error> {
+        use crate::schema::users::dsl::*;
+        diesel::update(users.filter(id.eq(user_id)))
+            .set(user)
+            .execute(conn)?;
+        Ok(User::get(conn, user_id).expect("User not found!"))
     }
 }
 

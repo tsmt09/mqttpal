@@ -1,0 +1,9 @@
+<tr>
+  <td>{{ user.id }}</td>
+  <td>{{ user.name }}</td>
+  <td>{{ user.email.clone().unwrap_or("".into()) }}</td>
+  <td>
+    <button hx-get="/user/{{ user.id }}/edit" hx-target="#mainWindow" hx-push-url="true">Edit</button>
+    <button hx-delete="/user/{{ user.id }}" hx-target="closest tr" hx-swap="outerHTML">Delete</button>
+  </td>
+</tr>

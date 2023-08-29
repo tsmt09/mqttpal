@@ -1,11 +1,23 @@
-<div class="f-switch justify-content:start" id="users">
+<div class="f-switch justify-content:start">
+  <table>
+    <thead>
+    <tr>
+      <th>id</th>
+      <th>Name</th>
+      <th>Email</th>
+      <th></th>  
+    </tr>
+    </thead>
+    <tbody id="users">
 {% for user in users %}
-{% include "user_card.html" %} 
+{% include "user_row.html" %} 
 {% endfor %}
+    </tbody>
+  </table>
 </div>
 
 <div class="box">
-  <form hx-post="/user/" hx-target="#users" hx-swap="afterend">
+  <form hx-post="/user/" hx-target="#mainWindow">
     <label for="name">Username</label>
     <input id="name" name="name">
     <label for="email">E-Mail</label>

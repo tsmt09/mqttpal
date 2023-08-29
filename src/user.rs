@@ -1,10 +1,11 @@
-use actix_web::{delete, post, web, HttpMessage, HttpRequest, HttpResponse, Responder};
+use actix_web::{delete, get, post, put, web, HttpResponse, Responder};
 use askama::Template;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    middleware::{htmx::HtmxHeaders, login_guard::LoginGuard},
+    middleware::login_guard::LoginGuard,
     models::user::{NewUser, Role, User},
+    users::UserListTemplate,
 };
 
 #[delete("/user/{id}")]
@@ -42,7 +43,7 @@ impl From<UserForm> for NewUser {
 }
 
 #[derive(Template)]
-#[template(path = "user_card.html")]
+#[template(path = "user_row.html")]
 struct UserRowTemplate {
     user: User,
 }
@@ -50,18 +51,52 @@ struct UserRowTemplate {
 #[post("/user/")]
 async fn post(
     _: LoginGuard,
-    req: HttpRequest,
     db: web::Data<crate::DbPool>,
     form: web::Form<UserForm>,
 ) -> impl Responder {
     let mut conn = db.get().expect("no connection available");
     let new_user: NewUser = form.into_inner().into();
-    let user = new_user.insert(&mut conn);
-    if let Some(htmx) = req.extensions_mut().get_mut::<HtmxHeaders>() {
-        if htmx.request() {
-            let template = UserRowTemplate { user }.render().unwrap();
-            return HttpResponse::Ok().body(template);
-        }
+    let _ = new_user.insert(&mut conn);
+    let users = User::list(&mut conn);
+    let template = UserListTemplate { users };
+    HttpResponse::Ok().body(template.render().unwrap())
+}
+
+#[derive(Template)]
+#[template(path = "user_edit.html")]
+struct UserEditTemplate {
+    user: User,
+}
+
+#[get("/{id}/edit")]
+async fn edit(_: LoginGuard, db: web::Data<crate::DbPool>, id: web::Path<i32>) -> impl Responder {
+    let mut conn = db.get().expect("no connection available");
+    let user = User::get(&mut conn, *id);
+    if let Some(user) = user {
+        let template = UserEditTemplate { user };
+        HttpResponse::Ok().body(template.render().unwrap())
+    } else {
+        HttpResponse::NotFound().body("User not found")
     }
-    HttpResponse::Ok().finish()
+}
+
+#[put("/user/{id}")]
+async fn put(
+    _: LoginGuard,
+    db: web::Data<crate::DbPool>,
+    id: web::Path<i32>,
+    form: web::Form<UserForm>,
+) -> impl Responder {
+    let mut conn = db.get().expect("no connection available");
+    let user = User::get(&mut conn, *id);
+    if let Some(mut user) = user {
+        let form = form.into_inner();
+        user.name = form.name;
+        user.email = form.email;
+        user.role_id = form.role_id.unwrap_or(Role::User as i32);
+        let _ = User::update(&mut conn, *id, &user);
+        HttpResponse::Ok().body("User successfully saved.")
+    } else {
+        HttpResponse::Ok().body("User to be updated not found.")
+    }
 }

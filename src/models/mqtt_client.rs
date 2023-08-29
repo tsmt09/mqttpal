@@ -29,6 +29,20 @@ impl MqttClient {
             }
         }
     }
+    pub fn get(conn: &mut diesel::SqliteConnection, mqtt_client_id: i32) -> Option<MqttClient> {
+        use crate::schema::mqtt_clients::dsl::*;
+        let res = mqtt_clients
+            .filter(id.eq(mqtt_client_id))
+            .select(MqttClient::as_select())
+            .load(conn);
+        match res {
+            Ok(mut ok) => ok.pop(),
+            Err(e) => {
+                log::error!("Error querying user: {:?}", e);
+                None
+            }
+        }
+    }
 }
 
 #[derive(Insertable, Debug)]

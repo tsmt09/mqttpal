@@ -1,0 +1,9 @@
+<tr>
+  <td>{{ mqtt_client.id }}</td>
+  <td>{{ mqtt_client.name }}</td>
+  <td>{{ mqtt_client.url }}</td>
+  <td>
+    <button hx-get="/mqtt_client/{{ mqtt_client.id }}" hx-target="#mainWindow">Details</button>
+    <button hx-delete="/mqtt_client/{{ mqtt_client.id }}" hx-target="closest tr">Delete</button>
+  </td>
+</tr>

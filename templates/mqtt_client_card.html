@@ -1,6 +1,0 @@
-<div class="box">
-  <p>Username: {{ mqtt_client.name }}</p>
-  <p>Email: {{ mqtt_client.url }}</p>
-  <button type="button" hx-get="/mqtt_client/{{ mqtt_client.id }}" hx-target="mainWindow">View</button>
-  <button type="button" hx-delete="/mqtt_client/{{ mqtt_client.id }}" hx-target="closest tr" hx-swap="outerHTML">Delete</button>
-</div>

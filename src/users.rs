@@ -1,10 +1,7 @@
 use actix_web::{get, web, HttpResponse, Responder};
 use askama::Template;
 
-use crate::{
-    middleware::login_guard::LoginGuard,
-    models::user::{Role, User},
-};
+use crate::{middleware::login_guard::LoginGuard, models::user::User};
 
 #[derive(Template)]
 #[template(path = "users.html")]

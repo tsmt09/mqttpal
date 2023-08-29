@@ -19,6 +19,7 @@ mod login;
 mod middleware;
 mod models;
 mod mqtt;
+mod mqtt_client;
 mod mqtt_clients;
 pub mod schema;
 mod user;
@@ -161,14 +162,11 @@ async fn main() -> std::io::Result<()> {
             Ok(())
         }
         CliCommands::Serve => {
-            let mut mqtt_manager = mqtt::MqttClientManager::new();
+            let mqtt_manager = mqtt::MqttClientManager::new();
             let session_key = get_session_key();
             let clients = models::mqtt_client::MqttClient::list(&mut pool.get().unwrap());
             for client in clients {
-                mqtt_manager
-                    .register_client(client.name, client.url)
-                    .await
-                    .unwrap();
+                let _ = mqtt_manager.register_client(client.name, client.url).await;
             }
             HttpServer::new(move || {
                 App::new()
@@ -187,12 +185,16 @@ async fn main() -> std::io::Result<()> {
                     .service(login::logout)
                     .service(user::delete_user)
                     .service(user::post)
+                    .service(user::put)
+                    .service(mqtt_client::post)
+                    .service(mqtt_client::delete)
                     .service(favicon)
                     .service(
                         web::scope("/users")
                             .wrap(FullPageRender)
                             .service(users::get),
                     )
+                    .service(web::scope("/user").wrap(FullPageRender).service(user::edit))
                     .service(
                         web::scope("/mqtt_clients")
                             .wrap(FullPageRender)
