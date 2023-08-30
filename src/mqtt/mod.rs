@@ -18,18 +18,18 @@ impl Drop for MqttClient {
 
 #[derive(Clone)]
 pub struct MqttClientManager {
-    clients: Arc<Mutex<HashMap<String, MqttClient>>>,
+    clients: Arc<Mutex<HashMap<i32, MqttClient>>>,
 }
 
 impl MqttClientManager {
     pub fn new() -> Self {
         MqttClientManager {
-            clients: Arc::new(Mutex::new(HashMap::<String, MqttClient>::new())),
+            clients: Arc::new(Mutex::new(HashMap::<i32, MqttClient>::new())),
         }
     }
     pub async fn register_client(
         &self,
-        client_id: String,
+        client_id: i32,
         mqtt_url: String,
     ) -> Result<(), Box<dyn std::error::Error>> {
         log::info!("Registering client: {} with url: {}", client_id, mqtt_url);
@@ -38,7 +38,7 @@ impl MqttClientManager {
         let (tx, _) = tokio::sync::broadcast::channel::<Event>(10);
 
         let tx2 = tx.clone();
-        let cid = client_id.clone();
+        let cid = client_id;
 
         tokio::spawn(async move {
             loop {
@@ -57,7 +57,7 @@ impl MqttClientManager {
         self.clients.lock().await.insert(client_id, client);
         Ok(())
     }
-    pub async fn unregister_client(&self, client_id: String) {
+    pub async fn unregister_client(&self, client_id: i32) {
         log::info!("Unregistering client: {}", client_id);
         let mut clients = self.clients.lock().await;
         let client = clients.remove(&client_id);
@@ -68,7 +68,7 @@ impl MqttClientManager {
     #[allow(dead_code)]
     pub async fn subscribe(
         &mut self,
-        client_id: String,
+        client_id: i32,
         topic: String,
     ) -> Result<(), Box<dyn std::error::Error>> {
         log::info!("Subscribing client: {} to topic: {}", client_id, topic);
@@ -78,9 +78,28 @@ impl MqttClientManager {
         Ok(())
     }
     #[allow(dead_code)]
-    pub async fn tx(&self, client_id: String) -> Option<tokio::sync::broadcast::Sender<Event>> {
+    pub async fn tx(&self, client_id: i32) -> Option<tokio::sync::broadcast::Sender<Event>> {
         let clients = self.clients.lock().await;
         let client = clients.get(&client_id)?;
         Some(client.tx.clone())
+    }
+    pub async fn connected(&self, _client_id: i32) -> bool {
+        // TODO: MqttClient has no connected method
+        true
+    }
+    pub async fn publish(
+        &self,
+        client_id: i32,
+        topic: String,
+        payload: Vec<u8>,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        log::info!("Publishing to client: {} to topic: {}", client_id, topic);
+        let mut clients = self.clients.lock().await;
+        let client = clients.get_mut(&client_id).unwrap();
+        client
+            .client
+            .publish(topic, QoS::AtLeastOnce, false, payload)
+            .await?;
+        Ok(())
     }
 }

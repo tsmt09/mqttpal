@@ -64,7 +64,7 @@ where
             };
             if let Some(htmx) = htmx {
                 if !htmx.request() {
-                    log::debug!("not htmx request, rendering full page");
+                    let status = resp.status();
                     let resp_body = if let Ok(body) =
                         std::str::from_utf8(&actix_web::body::to_bytes(resp.into_body()).await?)
                     {
@@ -76,7 +76,7 @@ where
                         user: username,
                         body: resp_body,
                     };
-                    let new_resp = HttpResponse::Ok().body(template.render().unwrap());
+                    let new_resp = HttpResponse::build(status).body(template.render().unwrap());
                     Ok(ServiceResponse::new(req, new_resp))
                 } else {
                     Ok(ServiceResponse::new(req, resp))

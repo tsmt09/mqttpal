@@ -1,1 +1,29 @@
-<h1>TODO page for client: {{ id }}</h1>
+<div class="box">
+  Name: {{ name }} <br/>
+  Connection Url: {{ uri }} <br/>
+  Connection Status: {% if connected %} Connected {% else %} Disconnected {% endif %} <br/>
+</div>
+
+<div class="box">
+  <form hx-post="/mqtt_client/{{ id }}/publish" hx-target="#responseBox">
+    <label for="topic">Topic</label>
+    <input id="topic" type="text" name="topic">
+    <label for="payload">Payload</label>
+    <input type="text" id="payload" name="payload">
+    <div class="right">
+      <button type="submit">Publish</button>
+    </div>
+  </form>
+  <div id="responseBox">
+  </div>
+</div>
+
+<div class="box">
+  <form method="get" action="{{ id }}/subscribe">
+    <label for="topic">Topic</label>
+    <input id="topic" type="text" name="topic">
+    <div class="right">
+      <button type="submit">Subscribe</button>
+    </div>
+  </form>
+</div>

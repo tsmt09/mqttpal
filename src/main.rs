@@ -22,6 +22,7 @@ mod mqtt;
 mod mqtt_client;
 mod mqtt_clients;
 pub mod schema;
+mod subscribe;
 mod user;
 mod users;
 
@@ -166,7 +167,7 @@ async fn main() -> std::io::Result<()> {
             let session_key = get_session_key();
             let clients = models::mqtt_client::MqttClient::list(&mut pool.get().unwrap());
             for client in clients {
-                let _ = mqtt_manager.register_client(client.name, client.url).await;
+                let _ = mqtt_manager.register_client(client.id, client.url).await;
             }
             HttpServer::new(move || {
                 App::new()

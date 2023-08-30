@@ -1,0 +1,8 @@
+{{ id }}: {{ topic }}
+<div hx-ext="ws" ws-connect="/mqtt_client/{{ id }}/subscribe/ws?topic={{ topic }}">
+  <form id="form" ws-send>
+    <input name="message">
+  </form>
+  <div id="responseBox">
+  </div>
+</div>
