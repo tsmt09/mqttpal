@@ -12,12 +12,12 @@
   </select>
   <div style="margin-top: 1em">
     <div class="float:left">
-      <button type="submit">Save</button>
+      <button type="submit" class="info bg border">Save</button>
       <div id="resultContainer">
       </div>
     </div>
     <div class="float:right">
-      <button hx-delete="/user/{{ user.id }}" hx-target="#mainWindow" hx-confirm="Are you sure to delete {{ user.name }}?">Delete</button>
+      <button class="bad bg border" hx-delete="/user/{{ user.id }}" hx-target="#mainWindow" hx-confirm="Are you sure to delete {{ user.name }}?">Delete</button>
     </div>
   </div>
 </form>

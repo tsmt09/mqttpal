@@ -7,7 +7,7 @@ services:
       args:
         INIT_USER_NAME: super_compose
     ports:
-      - "8081:8081"
+      - "8081:8080"
     environment:
       RUST_LOG: DEBUG
       SESSION_KEY: "32YklSvWJ9ebZXYlrdijmxvB8nMwHH82S11eleqR9NKcJEVb9t1srfqUxe2VMnhd80Wv/45ViGYKQcyf/SyKwg=="
