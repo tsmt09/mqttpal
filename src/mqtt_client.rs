@@ -1,10 +1,10 @@
 use crate::{
-    middleware::login_guard::LoginGuard,
+    middleware::{fullpage_render::FullPageRender, login_guard::LoginGuard},
     models::mqtt_client::{MqttClient, NewMqttClient},
     mqtt::MqttClientManager,
     mqtt_clients::MqttClientListTemplate,
 };
-use actix_web::{delete, get, post, web, HttpResponse, Responder};
+use actix_web::{web, HttpResponse, Responder};
 use askama::Template;
 use serde::{Deserialize, Serialize};
 
@@ -23,7 +23,18 @@ impl From<MqttClientForm> for NewMqttClient {
     }
 }
 
-#[post("/mqtt_client/")]
+pub fn client_scoped(cfg: &mut web::ServiceConfig) {
+    cfg.service(
+        web::scope("/mqtt_client")
+            .service(
+                web::resource("/{id}")
+                    .route(web::get().to(get).wrap(FullPageRender))
+                    .route(web::delete().to(delete)),
+            )
+            .service(web::resource("/").route(web::post().to(post))),
+    );
+}
+
 async fn post(
     _: LoginGuard,
     db: web::Data<crate::DbPool>,
@@ -39,7 +50,6 @@ async fn post(
     HttpResponse::Ok().body(template.render().unwrap())
 }
 
-#[delete("/mqtt_client/{id}")]
 async fn delete(
     _: LoginGuard,
     db: web::Data<crate::DbPool>,
@@ -67,7 +77,7 @@ struct MqttClientTemplate {
     id: i32,
 }
 
-#[get("/{id}")]
+//#[get("/{id}")]
 async fn get(_: LoginGuard, id: web::Path<i32>) -> impl Responder {
     let template = MqttClientTemplate { id: *id };
     HttpResponse::Ok().body(template.render().unwrap())

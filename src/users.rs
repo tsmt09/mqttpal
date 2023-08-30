@@ -1,7 +1,13 @@
+use crate::{
+    middleware::{fullpage_render::FullPageRender, login_guard::LoginGuard},
+    models::user::User,
+};
 use actix_web::{get, web, HttpResponse, Responder};
 use askama::Template;
 
-use crate::{middleware::login_guard::LoginGuard, models::user::User};
+pub fn users_scoped(cfg: &mut web::ServiceConfig) {
+    cfg.service(web::scope("/users").wrap(FullPageRender).service(get));
+}
 
 #[derive(Template)]
 #[template(path = "users.html")]

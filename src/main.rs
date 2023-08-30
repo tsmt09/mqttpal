@@ -181,35 +181,12 @@ async fn main() -> std::io::Result<()> {
                     // resources which are always available
                     .service(actix_files::Files::new("/css/", "static/css/"))
                     .service(actix_files::Files::new("/js/", "static/js/"))
-                    .service(login::post)
-                    .service(login::logout)
-                    .service(user::delete_user)
-                    .service(user::post)
-                    .service(user::put)
-                    .service(mqtt_client::post)
-                    .service(mqtt_client::delete)
                     .service(favicon)
-                    .service(
-                        web::scope("/users")
-                            .wrap(FullPageRender)
-                            .service(users::get),
-                    )
-                    .service(web::scope("/user").wrap(FullPageRender).service(user::edit))
-                    .service(
-                        web::scope("/mqtt_client")
-                            .wrap(FullPageRender)
-                            .service(mqtt_client::get),
-                    )
-                    .service(
-                        web::scope("/mqtt_clients")
-                            .wrap(FullPageRender)
-                            .service(mqtt_clients::get),
-                    )
-                    .service(
-                        web::scope("/login")
-                            .wrap(FullPageRender)
-                            .service(login::get),
-                    )
+                    .configure(login::login_scoped)
+                    .configure(users::users_scoped)
+                    .configure(user::user_scoped)
+                    .configure(mqtt_clients::clients_scoped)
+                    .configure(mqtt_client::client_scoped)
                     .service(web::scope("/").wrap(FullPageRender).service(index))
                 // guarded resources
             })

@@ -1,15 +1,29 @@
-use actix_web::{delete, get, post, put, web, HttpMessage, HttpRequest, HttpResponse, Responder};
+use actix_web::{web, HttpMessage, HttpRequest, HttpResponse, Responder};
 use askama::Template;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    middleware::{htmx::HtmxHeaders, login_guard::LoginGuard},
+    middleware::{fullpage_render::FullPageRender, htmx::HtmxHeaders, login_guard::LoginGuard},
     models::user::{NewUser, Role, User},
     users::UserListTemplate,
 };
 
-#[delete("/user/{id}")]
-async fn delete_user(
+pub fn user_scoped(cfg: &mut web::ServiceConfig) {
+    cfg.service(
+        web::scope("/user")
+            .service(
+                web::resource("/{id}")
+                    .route(web::delete().to(delete))
+                    .route(web::put().to(put)),
+            )
+            .service(
+                web::resource("/{id}/edit").route(web::get().to(get_edit).wrap(FullPageRender)),
+            )
+            .service(web::resource("/").route(web::post().to(post))),
+    );
+}
+
+async fn delete(
     _: LoginGuard,
     req: HttpRequest,
     db: web::Data<crate::DbPool>,
@@ -52,7 +66,6 @@ struct UserRowTemplate {
     user: User,
 }
 
-#[post("/user/")]
 async fn post(
     _: LoginGuard,
     db: web::Data<crate::DbPool>,
@@ -72,8 +85,11 @@ struct UserEditTemplate {
     user: User,
 }
 
-#[get("/{id}/edit")]
-async fn edit(_: LoginGuard, db: web::Data<crate::DbPool>, id: web::Path<i32>) -> impl Responder {
+async fn get_edit(
+    _: LoginGuard,
+    db: web::Data<crate::DbPool>,
+    id: web::Path<i32>,
+) -> impl Responder {
     let mut conn = db.get().expect("no connection available");
     let user = User::get(&mut conn, *id);
     if let Some(user) = user {
@@ -84,7 +100,6 @@ async fn edit(_: LoginGuard, db: web::Data<crate::DbPool>, id: web::Path<i32>) -
     }
 }
 
-#[put("/user/{id}")]
 async fn put(
     _: LoginGuard,
     _req: HttpRequest,

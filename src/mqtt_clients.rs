@@ -1,7 +1,18 @@
 use actix_web::{get, web, HttpResponse, Responder};
 use askama::Template;
 
-use crate::{middleware::login_guard::LoginGuard, models::mqtt_client::MqttClient};
+use crate::{
+    middleware::{fullpage_render::FullPageRender, login_guard::LoginGuard},
+    models::mqtt_client::MqttClient,
+};
+
+pub fn clients_scoped(cfg: &mut web::ServiceConfig) {
+    cfg.service(
+        web::scope("/mqtt_clients")
+            .wrap(FullPageRender)
+            .service(get),
+    );
+}
 
 #[derive(Template)]
 #[template(path = "mqtt_clients.html")]

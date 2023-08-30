@@ -1,11 +1,25 @@
 use crate::{
-    middleware::{htmx::HtmxHeaders, login_guard::LoginGuard, user_session::UserSession},
+    middleware::{
+        fullpage_render::FullPageRender, htmx::HtmxHeaders, login_guard::LoginGuard,
+        user_session::UserSession,
+    },
     models::user::User,
 };
 use actix_session::Session;
-use actix_web::{get, post, web, HttpMessage, HttpRequest, HttpResponse, Responder};
+use actix_web::{web, HttpMessage, HttpRequest, HttpResponse, Responder};
 use askama::Template;
 use serde::{Deserialize, Serialize};
+
+pub fn login_scoped(cfg: &mut web::ServiceConfig) {
+    cfg.service(
+        web::scope("/login").service(
+            web::resource("/")
+                .route(web::get().to(get).wrap(FullPageRender))
+                .route(web::post().to(post)),
+        ),
+    );
+    cfg.service(web::scope("/logout").service(web::resource("/").route(web::post().to(logout))));
+}
 
 #[derive(Serialize, Deserialize, Debug)]
 struct LoginForm {
@@ -20,7 +34,6 @@ pub struct LoginTemplate {
     pub user: Option<String>,
 }
 
-#[get("/")]
 async fn get(req: HttpRequest, usersession: UserSession) -> impl Responder {
     let template = if let Some(htmx) = req.extensions_mut().get_mut::<HtmxHeaders>() {
         log::debug!("Is htmx req? {}", htmx.request());
@@ -41,7 +54,6 @@ async fn get(req: HttpRequest, usersession: UserSession) -> impl Responder {
     HttpResponse::Ok().body(template.render().unwrap())
 }
 
-#[post("/logout/")]
 async fn logout(_: LoginGuard, req: HttpRequest, session: Session) -> impl Responder {
     session.purge();
     if let Some(htmx) = req.extensions_mut().get_mut::<HtmxHeaders>() {
@@ -53,7 +65,6 @@ async fn logout(_: LoginGuard, req: HttpRequest, session: Session) -> impl Respo
     HttpResponse::Ok().finish()
 }
 
-#[post("/login/")]
 async fn post(
     req: HttpRequest,
     db: web::Data<crate::DbPool>,
