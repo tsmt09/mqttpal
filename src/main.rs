@@ -195,7 +195,11 @@ async fn main() -> std::io::Result<()> {
                             .service(users::get),
                     )
                     .service(web::scope("/user").wrap(FullPageRender).service(user::edit))
-                    .service(web::scope("/mqtt_client").wrap(FullPageRender).service(mqtt_client::get))
+                    .service(
+                        web::scope("/mqtt_client")
+                            .wrap(FullPageRender)
+                            .service(mqtt_client::get),
+                    )
                     .service(
                         web::scope("/mqtt_clients")
                             .wrap(FullPageRender)

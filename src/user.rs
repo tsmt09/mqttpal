@@ -1,9 +1,9 @@
-use actix_web::{delete, get, post, put, web, HttpResponse, Responder, HttpRequest, HttpMessage};
+use actix_web::{delete, get, post, put, web, HttpMessage, HttpRequest, HttpResponse, Responder};
 use askama::Template;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    middleware::{login_guard::LoginGuard, htmx::HtmxHeaders},
+    middleware::{htmx::HtmxHeaders, login_guard::LoginGuard},
     models::user::{NewUser, Role, User},
     users::UserListTemplate,
 };
@@ -87,7 +87,7 @@ async fn edit(_: LoginGuard, db: web::Data<crate::DbPool>, id: web::Path<i32>) -
 #[put("/user/{id}")]
 async fn put(
     _: LoginGuard,
-    req: HttpRequest,
+    _req: HttpRequest,
     db: web::Data<crate::DbPool>,
     id: web::Path<i32>,
     form: web::Form<UserForm>,
