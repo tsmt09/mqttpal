@@ -4,7 +4,7 @@ use crate::{
     mqtt::MqttClientManager,
     mqtt_clients::MqttClientListTemplate,
 };
-use actix_web::{delete, post, web, HttpResponse, Responder};
+use actix_web::{delete, post, web, HttpResponse, Responder, get};
 use askama::Template;
 use serde::{Deserialize, Serialize};
 
@@ -60,3 +60,19 @@ async fn delete(
         HttpResponse::NotFound().body("MqttClient not found")
     }
 }
+
+#[derive(Template)]
+#[template(path = "mqtt_client.html")]
+struct MqttClientTemplate {
+  id: i32
+}
+
+#[get("/{id}")]
+async fn get(
+    _: LoginGuard,
+    id: web::Path<i32>,
+) -> impl Responder {
+    let template = MqttClientTemplate { id: *id };
+    HttpResponse::Ok().body(template.render().unwrap())
+}
+

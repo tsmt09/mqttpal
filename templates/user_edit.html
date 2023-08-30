@@ -10,11 +10,14 @@
     <option value="1" {% if user.role_id == 1 %} selected {% else %}{% endif %}>User</option>
     <option value="0" {% if user.role_id == 0 %} selected {% else %}{% endif %}>Admin</option>
   </select>
-  <div class="float:right">
-    <button type="submit">Save</button>
-    <button hx-get="/users/" hx-target="#mainWindow">Cancel</button>
+  <div style="margin-top: 1em">
+    <div class="float:left">
+      <button type="submit">Save</button>
+      <div id="resultContainer">
+      </div>
+    </div>
+    <div class="float:right">
+      <button hx-delete="/user/{{ user.id }}" hx-target="#mainWindow" hx-confirm="Are you sure to delete {{ user.name }}?">Delete</button>
+    </div>
   </div>
 </form>
-<div id="resultContainer">
-
-</div>

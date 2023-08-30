@@ -1,9 +1,9 @@
-use actix_web::{delete, get, post, put, web, HttpResponse, Responder};
+use actix_web::{delete, get, post, put, web, HttpResponse, Responder, HttpRequest, HttpMessage};
 use askama::Template;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    middleware::login_guard::LoginGuard,
+    middleware::{login_guard::LoginGuard, htmx::HtmxHeaders},
     models::user::{NewUser, Role, User},
     users::UserListTemplate,
 };
@@ -11,15 +11,19 @@ use crate::{
 #[delete("/user/{id}")]
 async fn delete_user(
     _: LoginGuard,
+    req: HttpRequest,
     db: web::Data<crate::DbPool>,
     id: web::Path<i32>,
 ) -> impl Responder {
     let mut conn = db.get().expect("no connection available");
     let deleted = User::delete(&mut conn, *id);
     if deleted {
-        HttpResponse::Ok().body("")
+        if let Some(htmx) = req.extensions_mut().get_mut::<HtmxHeaders>() {
+            htmx.set_redirect("/users/");
+        }
+        HttpResponse::Ok().body("User deleted.")
     } else {
-        HttpResponse::NotFound().body("User not found")
+        HttpResponse::NotFound().body("User not found.")
     }
 }
 
@@ -83,6 +87,7 @@ async fn edit(_: LoginGuard, db: web::Data<crate::DbPool>, id: web::Path<i32>) -
 #[put("/user/{id}")]
 async fn put(
     _: LoginGuard,
+    req: HttpRequest,
     db: web::Data<crate::DbPool>,
     id: web::Path<i32>,
     form: web::Form<UserForm>,
