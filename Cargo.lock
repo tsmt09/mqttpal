@@ -1381,6 +1381,7 @@ dependencies = [
  "futures-util",
  "log",
  "pretty_env_logger",
+ "rand",
  "redis",
  "rumqttc",
  "serde",

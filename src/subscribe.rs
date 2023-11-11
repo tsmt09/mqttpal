@@ -1,14 +1,15 @@
-use crate::middleware::fullpage_render::FullPageRender;
-use actix::{Actor, StreamHandler};
+use crate::{middleware::fullpage_render::FullPageRender, mqtt::{MqttMessage, MqttClientActor}};
+use actix::{Actor, Handler, StreamHandler, System, AsyncContext, Addr};
 use actix_web::{web, Error, HttpRequest, HttpResponse};
-use actix_web_actors::ws::{self};
+use actix_web_actors::ws::{self, CloseReason};
 use askama::Template;
 use serde::{Deserialize, Serialize};
 
 /// Define HTTP actor
 struct WsSubscription {
-    topic: String,
-    tx: tokio::sync::broadcast::Sender<rumqttc::Event>,
+    client_name: String,
+    ws_id: i32,
+    addr: Addr<MqttClientActor>,
 }
 
 pub fn subscribe_scoped(cfg: &mut web::ServiceConfig) {
@@ -21,6 +22,31 @@ pub fn subscribe_scoped(cfg: &mut web::ServiceConfig) {
 
 impl Actor for WsSubscription {
     type Context = ws::WebsocketContext<Self>;
+    fn started(&mut self, ctx: &mut Self::Context) {
+        log::info!("started ws -> mqtt actor");
+        let addr = ctx.address().recipient();
+        self.addr.do_send(MqttMessage::Sub((self.ws_id, addr)));
+    }
+}
+
+impl Handler<MqttMessage> for WsSubscription {
+    type Result = ();
+    fn handle(&mut self, msg: MqttMessage, ctx: &mut Self::Context) -> Self::Result {
+        log::info!("Got mqtt message: {:?}", msg);
+        match msg {
+            MqttMessage::Message(publsh) => {
+                let topic = publsh.topic;
+                let payload = String::from_utf8(publsh.payload.into()).unwrap();
+                let response = MessageTemplate { topic, payload }.render().unwrap();
+                ctx.text(response);
+            },
+            MqttMessage::Disconnect => {
+                log::info!("Disconnect from mqtt manager!");
+                ctx.close(None);
+            },
+            _ => ()
+        }
+    }
 }
 
 /// Handler for ws::Message message
@@ -28,15 +54,9 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSubscription {
     fn handle(&mut self, msg: Result<ws::Message, ws::ProtocolError>, ctx: &mut Self::Context) {
         match msg {
             Ok(ws::Message::Ping(msg)) => ctx.pong(&msg),
-            Ok(ws::Message::Text(text)) => ctx.text({
-                format!(
-                    "<div id=\"responseBox\" hx-swap-oob=\"beforeend\">{}</div>",
-                    text
-                )
-            }),
-            Ok(ws::Message::Binary(bin)) => ctx.binary(bin),
             Ok(ws::Message::Close(_)) => {
                 log::info!("Closing websocket connection");
+                self.addr.do_send(MqttMessage::Unsub(self.ws_id));
                 ctx.close(None)
             }
             _ => (),
@@ -48,15 +68,21 @@ async fn ws(
     req: HttpRequest,
     stream: web::Payload,
     name: web::Path<String>,
-    query: web::Query<SubscriptionForm>,
     mqtt_clients: web::Data<crate::mqtt::MqttClientManager>,
 ) -> Result<HttpResponse, Error> {
-    if let Some(tx) = mqtt_clients.tx(&name).await {
-        let topic = query.topic.clone();
-        ws::start(WsSubscription { topic, tx }, &req, stream)
+    let ws_id = rand::random::<i32>();
+    if let Some(addr) = mqtt_clients.get_client_actor_addr(&name).await {
+        ws::start(
+            WsSubscription {
+                client_name: name.clone(),
+                ws_id,
+                addr
+            },
+            &req,
+            stream,
+        )
     } else {
-        log::info!("Client not found");
-        return Ok(HttpResponse::NotFound().body("Client not found"));
+        Ok(HttpResponse::NotFound().body("MqttClient not found"))
     }
 }
 
@@ -64,19 +90,19 @@ async fn ws(
 #[template(path = "subscribe.html")]
 struct SubscriptionTemplate {
     name: String,
-    topic: String,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-struct SubscriptionForm {
+#[derive(Template)]
+#[template(path = "mqtt_message.html")]
+struct MessageTemplate {
     topic: String,
+    payload: String,
 }
 
-async fn get(name: web::Path<String>, query: web::Query<SubscriptionForm>) -> HttpResponse {
+async fn get(name: web::Path<String>) -> HttpResponse {
     HttpResponse::Ok().body(
         SubscriptionTemplate {
             name: name.clone(),
-            topic: query.topic.clone(),
         }
         .render()
         .unwrap(),

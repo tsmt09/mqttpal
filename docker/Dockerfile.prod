@@ -1,9 +1,7 @@
 # Use the official Rust image as the base image
 FROM rust:1.71-bookworm as builder
 
-# Install libopenssl and libsqlite3 for building
-RUN apt-get update && \
-    apt-get install -y libssl-dev libsqlite3-dev
+RUN apt-get update
 
 # Set the working directory in the container
 WORKDIR /app
@@ -17,7 +15,6 @@ RUN mkdir src && echo "fn main() {}" > src/main.rs && cargo build --release
 # Copy the rest of the application code
 COPY ./src ./src
 COPY ./templates ./templates
-COPY ./migrations ./migrations
 COPY ./static ./static
 
 # Build the actual application
@@ -29,7 +26,6 @@ ENV RUST_LOG=info
 
 # Install libopenssl and libsqlite3 in the runtime environment
 RUN apt-get update && \
-    apt-get install -y libssl-dev libsqlite3-0 && \
     rm -rf /var/lib/apt/lists/*
 
 # Set the working directory in the container
@@ -40,7 +36,6 @@ COPY --from=builder /app/target/release/mqttpal .
 
 # Copy additional folders needed for runtime
 COPY --from=builder /app/templates ./templates
-COPY --from=builder /app/migrations ./migrations
 COPY --from=builder /app/static ./static
 
 COPY ./docker/entrypoint.sh entrypoint.sh

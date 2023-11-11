@@ -1,8 +1,5 @@
-{{ name }}: {{ topic }}
-<div hx-ext="ws" ws-connect="/mqtt_client/{{ name }}/subscribe/ws?topic={{ topic|urlencode_strict }}">
-  <form id="form" ws-send>
-    <input name="message">
-  </form>
-  <div id="responseBox">
+MQTT Traffic for {{ name }}
+<div hx-ext="ws" ws-connect="/mqtt_client/{{ name }}/subscribe/ws" hx-target="#responseBox">
+  <div id="mqtt_messages">
   </div>
 </div>

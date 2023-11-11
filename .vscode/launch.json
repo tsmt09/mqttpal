@@ -7,20 +7,14 @@
     {
       "type": "lldb",
       "request": "launch",
-      "name": "Debug executable 'mqttweb'",
+      "name": "Debug executable 'mqttpal'",
       "cargo": {
         "args": [
           "build",
-          "--bin=mqttweb",
-          "--package=mqttweb"
         ],
-        "filter": {
-          "name": "mqttweb",
-          "kind": "bin"
-        }
       },
       "args": ["serve"],
-      "cwd": "${workspaceFolder}/mqttweb"
+      "cwd": "${workspaceFolder}"
     },
     {
       "type": "lldb",
@@ -30,8 +24,6 @@
         "args": [
           "test",
           "--no-run",
-          "--bin=mqttweb",
-          "--package=mqttweb"
         ],
         "filter": {
           "name": "mqttweb",
@@ -49,8 +41,6 @@
         "args": [
           "test",
           "--no-run",
-          "--lib",
-          "--package=duke"
         ],
         "filter": {
           "name": "duke",

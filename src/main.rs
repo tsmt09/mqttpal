@@ -1,6 +1,7 @@
 use crate::middleware::fullpage_render::FullPageRender;
 use crate::middleware::user_session::UserSession;
 use crate::models::user::Role;
+use actix::System;
 use actix_files::NamedFile;
 use actix_session::{storage::CookieSessionStore, Session, SessionMiddleware};
 use actix_web::{cookie::Key, get, web, App, HttpResponse, HttpServer, Responder};
@@ -151,8 +152,9 @@ async fn main() -> std::io::Result<()> {
             let session_key = get_session_key();
             let clients = models::mqtt_client::MqttClient::list(&pool).await;
             for client in clients {
-                let _ = mqtt_manager.register_client(client.name, client.url).await;
+                mqtt_manager.register_client(client.name, client.url).await.unwrap();
             }
+            log::info!("Current Actix System: {}", System::id(&System::try_current().unwrap()));
             HttpServer::new(move || {
                 App::new()
                     .app_data(web::Data::new(pool.clone()))

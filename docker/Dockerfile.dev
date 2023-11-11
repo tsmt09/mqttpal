@@ -7,7 +7,6 @@ WORKDIR /app
 # Install system dependencies
 RUN apt-get update && \
     apt-get install -y \
-    libssl-dev libsqlite3-dev
 
 # Install `cargo watch`
 RUN cargo install cargo-watch
@@ -29,15 +28,6 @@ COPY ./static ./static
 
 # Build the project to download dependencies
 RUN cargo build
-
-# run database migration
-ENV DATABASE_URL=sqlite://mqttpal.db
-RUN diesel migration run
-
-ARG INIT_USER_NAME=super
-ARG INIT_USER_PASSWORD=dev
-ENV INIT_USER_EMAIL=super@dev.de
-RUN target/debug/mqttpal create-init-user $INIT_USER_NAME $INIT_USER_PASSWORD $INIT_USER_EMAIL 
 
 # Set the environment variables
 ENV RUST_LOG=info
