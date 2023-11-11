@@ -1,9 +1,7 @@
 name: Build and push development docker image
 
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:
 
 jobs:
   test:
