@@ -1,18 +1,16 @@
 use crate::middleware::fullpage_render::FullPageRender;
 use crate::middleware::user_session::UserSession;
-use crate::models::mqtt_client::NewMqttClient;
 use crate::models::user::Role;
 use actix_files::NamedFile;
 use actix_session::{storage::CookieSessionStore, Session, SessionMiddleware};
 use actix_web::{cookie::Key, get, web, App, HttpResponse, HttpServer, Responder};
 use askama::Template;
 use base64::Engine;
+use bb8::Pool;
+use bb8_redis::RedisMultiplexedConnectionManager;
 use clap::Args;
 use clap::Parser;
 use clap::Subcommand;
-use diesel::sqlite::Sqlite;
-use diesel::SqliteConnection;
-use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 use middleware::htmx::Htmx;
 
 mod login;
@@ -21,20 +19,16 @@ mod models;
 mod mqtt;
 mod mqtt_client;
 mod mqtt_clients;
-pub mod schema;
 mod subscribe;
 mod user;
 mod users;
 
-pub type DbPool = diesel::r2d2::Pool<diesel::r2d2::ConnectionManager<SqliteConnection>>;
-
-pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
+type DbPool = Pool<RedisMultiplexedConnectionManager>;
 
 #[derive(Subcommand, Debug)]
 enum CliCommands {
     Serve,
     CreateSessionKey,
-    Migrate,
     CreateInitUser(CreateInitUserArgs),
     CreateClient(CreateClientArgs),
 }
@@ -83,14 +77,6 @@ fn create_session_key() -> Key {
     Key::generate()
 }
 
-fn run_migrations(
-    connection: &mut impl MigrationHarness<Sqlite>,
-) -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>> {
-    log::info!("running migrations ...");
-    connection.run_pending_migrations(MIGRATIONS)?;
-    Ok(())
-}
-
 fn get_session_key() -> Key {
     let key = std::env::var("SESSION_KEY").unwrap_or_else(|_| {
         let key = create_session_key();
@@ -114,10 +100,15 @@ async fn main() -> std::io::Result<()> {
     let cli = CliArgs::parse();
     log::debug!("Command Line Args: {:?}", cli);
     let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-    let manager = diesel::r2d2::ConnectionManager::<SqliteConnection>::new(&database_url);
-    let pool = diesel::r2d2::Pool::builder()
+    let manager = bb8_redis::RedisMultiplexedConnectionManager::new(database_url)
+        .expect("Cannot connect to redis");
+    let pool = bb8::Pool::builder()
+        .min_idle(Some(2))
+        .max_size(5)
+        .connection_timeout(std::time::Duration::from_secs(5))
         .build(manager)
-        .expect("failed to build connection pool");
+        .await
+        .expect("Cannot create redis pool");
     match cli.command {
         CliCommands::CreateSessionKey => {
             log::info!("Generating session key");
@@ -129,45 +120,38 @@ async fn main() -> std::io::Result<()> {
             Ok(())
         }
         CliCommands::CreateInitUser(user) => {
-            let mut conn = pool.get().expect("cannot get connection from pool!");
-            let existing_users = models::user::User::list(&mut conn).len();
+            let existing_users = models::user::User::list(&pool).await.len();
             if existing_users > 0 {
                 log::info!("Users already exist, skipping init user creation");
                 return Ok(());
             }
-            let user = models::user::NewUser {
+            let user = models::user::User {
                 name: user.name,
                 password: user.password,
                 email: user.email,
                 role_id: user.role_id.unwrap_or(Role::Admin as i32),
             };
-            let result = user.insert(&mut conn);
-            log::info!("Inserted User: {result:?}");
+            user.insert(&pool).await;
+            log::info!("Inserted User: {}", user.name);
             // do some serve
             Ok(())
         }
         CliCommands::CreateClient(client) => {
-            let new_client = NewMqttClient {
+            let new_client = models::mqtt_client::MqttClient {
                 name: client.name,
                 url: client.url,
             };
-            let mut conn = pool.get().expect("cannot get connection from pool!");
-            let result = new_client.insert(&mut conn);
+            let result = new_client.insert(&pool).await;
             log::info!("Inserted Client: {result:?}");
             // do some serve
-            Ok(())
-        }
-        CliCommands::Migrate => {
-            let mut conn = pool.get().expect("cannot get connection from pool!");
-            run_migrations(&mut conn).expect("migrations have not been run successfully");
             Ok(())
         }
         CliCommands::Serve => {
             let mqtt_manager = mqtt::MqttClientManager::new();
             let session_key = get_session_key();
-            let clients = models::mqtt_client::MqttClient::list(&mut pool.get().unwrap());
+            let clients = models::mqtt_client::MqttClient::list(&pool).await;
             for client in clients {
-                let _ = mqtt_manager.register_client(client.id, client.url).await;
+                let _ = mqtt_manager.register_client(client.name, client.url).await;
             }
             HttpServer::new(move || {
                 App::new()

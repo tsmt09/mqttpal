@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     middleware::{fullpage_render::FullPageRender, htmx::HtmxHeaders, login_guard::LoginGuard},
-    models::user::{NewUser, Role, User},
+    models::user::{Role, User},
     users::UserListTemplate,
 };
 
@@ -14,7 +14,6 @@ pub fn user_scoped(cfg: &mut web::ServiceConfig) {
             .service(
                 web::resource("/{id}")
                     .route(web::delete().to(delete))
-                    .route(web::put().to(put)),
             )
             .service(
                 web::resource("/{id}/edit").route(web::get().to(get_edit).wrap(FullPageRender)),
@@ -27,10 +26,9 @@ async fn delete(
     _: LoginGuard,
     req: HttpRequest,
     db: web::Data<crate::DbPool>,
-    id: web::Path<i32>,
+    name: web::Path<String>,
 ) -> impl Responder {
-    let mut conn = db.get().expect("no connection available");
-    let deleted = User::delete(&mut conn, *id);
+    let deleted = User::delete(&db, &name).await;
     if deleted {
         if let Some(htmx) = req.extensions_mut().get_mut::<HtmxHeaders>() {
             htmx.set_redirect("/users/");
@@ -49,9 +47,9 @@ struct UserForm {
     role_id: Option<i32>,
 }
 
-impl From<UserForm> for NewUser {
+impl From<UserForm> for User {
     fn from(form: UserForm) -> Self {
-        NewUser {
+        User {
             name: form.name,
             password: form.password,
             email: form.email,
@@ -71,10 +69,9 @@ async fn post(
     db: web::Data<crate::DbPool>,
     form: web::Form<UserForm>,
 ) -> impl Responder {
-    let mut conn = db.get().expect("no connection available");
-    let new_user: NewUser = form.into_inner().into();
-    let _ = new_user.insert(&mut conn);
-    let users = User::list(&mut conn);
+    let user: User = form.into_inner().into();
+    user.insert(&db).await;
+    let users = User::list(&db).await;
     let template = UserListTemplate { users };
     HttpResponse::Ok().body(template.render().unwrap())
 }
@@ -88,35 +85,13 @@ struct UserEditTemplate {
 async fn get_edit(
     _: LoginGuard,
     db: web::Data<crate::DbPool>,
-    id: web::Path<i32>,
+    name: web::Path<String>,
 ) -> impl Responder {
-    let mut conn = db.get().expect("no connection available");
-    let user = User::get(&mut conn, *id);
+    let user = User::get_by_name(&db, &name).await;
     if let Some(user) = user {
         let template = UserEditTemplate { user };
         HttpResponse::Ok().body(template.render().unwrap())
     } else {
         HttpResponse::NotFound().body("User not found")
-    }
-}
-
-async fn put(
-    _: LoginGuard,
-    _req: HttpRequest,
-    db: web::Data<crate::DbPool>,
-    id: web::Path<i32>,
-    form: web::Form<UserForm>,
-) -> impl Responder {
-    let mut conn = db.get().expect("no connection available");
-    let user = User::get(&mut conn, *id);
-    if let Some(mut user) = user {
-        let form = form.into_inner();
-        user.name = form.name;
-        user.email = form.email;
-        user.role_id = form.role_id.unwrap_or(Role::User as i32);
-        let _ = User::update(&mut conn, *id, &user);
-        HttpResponse::Ok().body("User successfully saved.")
-    } else {
-        HttpResponse::Ok().body("User to be updated not found.")
     }
 }

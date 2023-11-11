@@ -1,4 +1,5 @@
-use diesel::prelude::*;
+use bb8_redis::redis::cmd;
+use serde::{Deserialize, Serialize};
 
 pub enum Role {
     Admin = 0,
@@ -15,11 +16,8 @@ impl From<i32> for Role {
     }
 }
 
-#[derive(Queryable, Selectable, AsChangeset, Debug)]
-#[diesel(table_name = crate::schema::users)]
-#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct User {
-    pub id: i32,
     pub name: String,
     pub email: Option<String>,
     pub password: String,
@@ -27,92 +25,61 @@ pub struct User {
 }
 
 impl User {
-    pub fn check(
-        conn: &mut diesel::SqliteConnection,
-        check_name: &str,
-        check_password: &str,
-    ) -> bool {
-        use crate::schema::users::dsl::*;
-        let res = users
-            .filter(name.eq(check_name).and(password.eq(check_password)))
-            .select(User::as_select())
-            .load(conn);
-        match res {
-            Ok(ok) => !ok.is_empty(),
-            Err(e) => {
-                log::error!("Error querying user: {:?}", e);
-                false
-            }
+    pub async fn check(pool: &crate::DbPool, check_name: &str, check_password: &str) -> bool {
+        let user = User::get_by_name(&pool, check_name).await;
+        if let Some(user) = user {
+            user.password == check_password
+        } else {
+            false
         }
     }
-    pub fn list(conn: &mut diesel::SqliteConnection) -> Vec<User> {
-        use crate::schema::users::dsl::*;
+
+    pub async fn get_by_name(pool: &crate::DbPool, name: &str) -> Option<User> {
+        let mut conn = pool.get().await.expect("no connection available");
+        let user: Option<String> = cmd("HGET").arg("users").arg(name)
+            .query_async(&mut *conn)
+            .await
+            .expect("Cannot query users from redis");
+        if let Some(user) = user {
+            let user: User = serde_json::from_str(&user).expect("Cannot deserialize user");
+            Some(user)
+        } else {
+            None
+        }
+    }
+
+    pub async fn list(pool: &crate::DbPool) -> Vec<User> {
+        let mut conn = pool.get().await.expect("no connection available");
+        let mut users_hash: Vec<String> = cmd("HGETALL").arg("users")
+            .query_async(&mut *conn)
+            .await
+            .expect("Cannot query users from redis");
+        let mut users: Vec<User> = Vec::new();
+        while let Some(user) = users_hash.pop() {
+            let user: User = serde_json::from_str(&user).expect("Cannot deserialize user");
+            users.push(user);
+            let _ = users_hash.pop();
+        }
         users
-            .select(User::as_select())
-            .load(conn)
-            .expect("Error loading users!")
     }
-    pub fn delete(conn: &mut diesel::SqliteConnection, user_id: i32) -> bool {
-        use crate::schema::users::dsl::*;
-        log::info!("Deleting user with id: {}", user_id);
-        let res = diesel::delete(users.filter(id.eq(user_id))).execute(conn);
+
+    pub async fn insert(&self, pool: &crate::DbPool) {
+        let mut conn = pool.get().await.expect("no connection available");
+        let user_json = serde_json::to_string(&self).expect("Cannot serialize user");
+        let _: i32 = cmd("HSET").arg("users").arg(&self.name).arg(user_json)
+            .query_async(&mut *conn)
+            .await
+            .expect("Cannot insert user");
+    }
+
+    pub async fn delete(pool: &crate::DbPool, name: &str) -> bool {
+        let mut conn = pool.get().await.expect("no connection available");
+        let res: Result<i32, redis::RedisError> = cmd("HDEL").arg("users").arg(name)
+            .query_async(&mut *conn)
+            .await;
         match res {
-            Ok(ok) => ok > 0,
-            Err(e) => {
-                log::error!("Error deleting user: {:?}", e);
-                false
-            }
+            Ok(i) => i > 0,
+            Err(_) => false,
         }
     }
-    pub fn get(conn: &mut diesel::SqliteConnection, user_id: i32) -> Option<User> {
-        use crate::schema::users::dsl::*;
-        let res = users
-            .filter(id.eq(user_id))
-            .select(User::as_select())
-            .load(conn);
-        match res {
-            Ok(ok) => ok.into_iter().next(),
-            Err(e) => {
-                log::error!("Error querying user: {:?}", e);
-                None
-            }
-        }
-    }
-    pub fn update(
-        conn: &mut diesel::SqliteConnection,
-        user_id: i32,
-        user: &User,
-    ) -> Result<User, diesel::result::Error> {
-        use crate::schema::users::dsl::*;
-        diesel::update(users.filter(id.eq(user_id)))
-            .set(user)
-            .execute(conn)?;
-        Ok(User::get(conn, user_id).expect("User not found!"))
-    }
-}
-
-#[derive(Insertable, Debug)]
-#[diesel(table_name = crate::schema::users)]
-#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
-pub struct NewUser {
-    pub name: String,
-    pub email: Option<String>,
-    pub password: String,
-    pub role_id: i32,
-}
-
-impl NewUser {
-    pub fn insert(&self, conn: &mut SqliteConnection) -> User {
-        log::info!("Inserting user: {:?}", self);
-        diesel::insert_into(crate::schema::users::table)
-            .values(self)
-            .returning(User::as_returning())
-            .get_result(conn)
-            .expect("Cannot insert user!")
-    }
-}
-
-pub struct _Role {
-    name: String,
-    permissions: Vec<String>,
 }

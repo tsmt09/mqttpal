@@ -72,8 +72,7 @@ async fn post(
     session: Session,
 ) -> impl Responder {
     log::debug!("User: {form:?}");
-    let mut conn = db.get().expect("no connection available");
-    let is_user = User::check(&mut conn, &form.name, &form.password);
+    let is_user = User::check(&db, &form.name, &form.password).await;
     if is_user {
         let _ = session.insert("loggedin", "true");
         let _ = session.insert("username", &form.name);

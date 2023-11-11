@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
-use rumqttc::{AsyncClient, Event, MqttOptions, QoS};
+use rumqttc::{AsyncClient, Event, MqttOptions, QoS, tokio_rustls::client};
 use tokio::sync::Mutex;
 
 #[derive(Clone)]
@@ -18,27 +18,27 @@ impl Drop for MqttClient {
 
 #[derive(Clone)]
 pub struct MqttClientManager {
-    clients: Arc<Mutex<HashMap<i32, MqttClient>>>,
+    clients: Arc<Mutex<HashMap<String, MqttClient>>>,
 }
 
 impl MqttClientManager {
     pub fn new() -> Self {
         MqttClientManager {
-            clients: Arc::new(Mutex::new(HashMap::<i32, MqttClient>::new())),
+            clients: Arc::new(Mutex::new(HashMap::<String, MqttClient>::new())),
         }
     }
     pub async fn register_client(
         &self,
-        client_id: i32,
+        client_name: String,
         mqtt_url: String,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        log::info!("Registering client: {} with url: {}", client_id, mqtt_url);
+        log::info!("Registering client: {} with url: {}", client_name, mqtt_url);
         let options = MqttOptions::parse_url(&mqtt_url)?;
         let (client, mut eventloop) = AsyncClient::new(options, 10);
         let (tx, _) = tokio::sync::broadcast::channel::<Event>(10);
 
         let tx2 = tx.clone();
-        let cid = client_id;
+        let cid = client_name.clone();
 
         tokio::spawn(async move {
             loop {
@@ -54,13 +54,13 @@ impl MqttClientManager {
         });
 
         let client = MqttClient { client, tx };
-        self.clients.lock().await.insert(client_id, client);
+        self.clients.lock().await.insert(client_name, client);
         Ok(())
     }
-    pub async fn unregister_client(&self, client_id: i32) {
-        log::info!("Unregistering client: {}", client_id);
+    pub async fn unregister_client(&self, client_name: &String) {
+        log::info!("Unregistering client: {}", &client_name);
         let mut clients = self.clients.lock().await;
-        let client = clients.remove(&client_id);
+        let client = clients.remove(client_name);
         if let Some(client) = client {
             client.client.disconnect().await.unwrap();
         }
@@ -68,34 +68,35 @@ impl MqttClientManager {
     #[allow(dead_code)]
     pub async fn subscribe(
         &mut self,
-        client_id: i32,
+        client_name: String,
         topic: String,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        log::info!("Subscribing client: {} to topic: {}", client_id, topic);
+        log::info!("Subscribing client: {} to topic: {}", client_name, topic);
         let mut clients = self.clients.lock().await;
-        let client = clients.get_mut(&client_id).unwrap();
+        let client = clients.get_mut(&client_name).unwrap();
         client.client.subscribe(topic, QoS::AtLeastOnce).await?;
         Ok(())
     }
     #[allow(dead_code)]
-    pub async fn tx(&self, client_id: i32) -> Option<tokio::sync::broadcast::Sender<Event>> {
+    pub async fn tx(&self, client_name: &String) -> Option<tokio::sync::broadcast::Sender<Event>> {
         let clients = self.clients.lock().await;
-        let client = clients.get(&client_id)?;
+        log::debug!("{:?}", clients.keys().collect::<Vec<&String>>());
+        let client = clients.get(client_name)?;
         Some(client.tx.clone())
     }
-    pub async fn connected(&self, _client_id: i32) -> bool {
+    pub async fn connected(&self, _client_name: &String) -> bool {
         // TODO: MqttClient has no connected method
         true
     }
     pub async fn publish(
         &self,
-        client_id: i32,
+        client_name: &String,
         topic: String,
         payload: Vec<u8>,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        log::info!("Publishing to client: {} to topic: {}", client_id, topic);
+        log::info!("Publishing to client: {} to topic: {}", client_name, topic);
         let mut clients = self.clients.lock().await;
-        let client = clients.get_mut(&client_id).unwrap();
+        let client = clients.get_mut(client_name).unwrap();
         client
             .client
             .publish(topic, QoS::AtLeastOnce, false, payload)

@@ -19,8 +19,10 @@ askama = "0.12.0"
 dotenv = "0.15.0"
 tokio = "1.32.0"
 serde = { version = "1.0.171", features = ["derive"] }
-diesel = { version = "2.1.0", features = ["sqlite", "chrono", "returning_clauses_for_sqlite_3_35", "r2d2"] }
-diesel_migrations = { version = "2.1.0", features = ["sqlite"] }
 chrono = "0.4.26"
 clap = { version = "4.3.19", features = ["derive"] }
 rumqttc = { version = "0.22.0", features = ["url"] }
+redis = { version = "0.23.3", features = ["r2d2", "aio", "cluster-async", "tokio-comp", "keep-alive"] }
+bb8 = "0.8.1"
+bb8-redis = "0.13.1"
+serde_json = "1.0.108"

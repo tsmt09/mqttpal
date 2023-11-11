@@ -1,6 +1,6 @@
 use crate::{
     middleware::{fullpage_render::FullPageRender, login_guard::LoginGuard},
-    models::mqtt_client::{MqttClient, NewMqttClient},
+    models::mqtt_client::MqttClient,
     mqtt::MqttClientManager,
     mqtt_clients::MqttClientListTemplate,
     subscribe,
@@ -15,9 +15,9 @@ struct MqttClientForm {
     url: String,
 }
 
-impl From<MqttClientForm> for NewMqttClient {
+impl From<MqttClientForm> for MqttClient {
     fn from(form: MqttClientForm) -> Self {
-        NewMqttClient {
+        MqttClient {
             name: form.name,
             url: form.url,
         }
@@ -44,11 +44,10 @@ async fn post(
     mqtt: web::Data<MqttClientManager>,
     form: web::Form<MqttClientForm>,
 ) -> impl Responder {
-    let mut conn = db.get().expect("no connection available");
-    let new_client: NewMqttClient = form.into_inner().into();
-    let client = new_client.insert(&mut conn);
-    let _ = mqtt.register_client(client.id, client.url).await;
-    let mqtt_clients = MqttClient::list(&mut conn);
+    let client: MqttClient = form.into_inner().into();
+    client.insert(&db).await;
+    let _ = mqtt.register_client(client.name, client.url).await;
+    let mqtt_clients = MqttClient::list(&db).await;
     let template = MqttClientListTemplate { mqtt_clients };
     HttpResponse::Ok().body(template.render().unwrap())
 }
@@ -57,18 +56,12 @@ async fn delete(
     _: LoginGuard,
     db: web::Data<crate::DbPool>,
     mqtt: web::Data<MqttClientManager>,
-    id: web::Path<i32>,
+    name: web::Path<String>,
 ) -> impl Responder {
-    let mut conn = db.get().expect("no connection available");
-    let client = MqttClient::get(&mut conn, *id);
-    if client.is_some() {
-        let _ = mqtt.unregister_client(*id).await;
-        let deleted = MqttClient::delete(&mut conn, *id);
-        if deleted {
-            HttpResponse::Ok().body("")
-        } else {
-            HttpResponse::NotFound().body("MqttClient not found")
-        }
+    let deleted = MqttClient::delete(&db, &name).await;
+    if deleted {
+        let _ = mqtt.unregister_client(&name).await;
+        HttpResponse::Ok().body("")
     } else {
         HttpResponse::NotFound().body("MqttClient not found")
     }
@@ -77,7 +70,6 @@ async fn delete(
 #[derive(Template)]
 #[template(path = "mqtt_client.html")]
 struct MqttClientTemplate {
-    id: i32,
     name: String,
     uri: String,
     connected: bool,
@@ -88,16 +80,14 @@ async fn get(
     _: LoginGuard,
     db: web::Data<crate::DbPool>,
     mqtt: web::Data<MqttClientManager>,
-    id: web::Path<i32>,
+    name: web::Path<String>,
 ) -> impl Responder {
-    let mut conn = db.get().expect("no connection available");
-    let db_client = MqttClient::get(&mut conn, *id);
+    let db_client = MqttClient::get_by_name(&db, &name).await;
     if let Some(db_client) = db_client {
         let template = MqttClientTemplate {
-            id: db_client.id,
-            name: db_client.name,
-            uri: db_client.url,
-            connected: mqtt.connected(db_client.id).await,
+            name: db_client.name.clone(),
+            uri: db_client.url.clone(),
+            connected: mqtt.connected(&db_client.name).await,
         };
         HttpResponse::Ok().body(template.render().unwrap())
     } else {
@@ -115,11 +105,11 @@ async fn post_publish(
     _: LoginGuard,
     mqtt: web::Data<MqttClientManager>,
     form: web::Form<MqttClientPublishForm>,
-    id: web::Path<i32>,
+    name: web::Path<String>,
 ) -> impl Responder {
     let form = form.into_inner();
     let _ = mqtt
-        .publish(*id, form.topic, Vec::from(form.payload.as_bytes()))
+        .publish(&name, form.topic, Vec::from(form.payload.as_bytes()))
         .await;
     HttpResponse::Ok().body("okay")
 }

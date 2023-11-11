@@ -17,8 +17,7 @@ pub struct UserListTemplate {
 
 #[get("/")]
 async fn get(_: LoginGuard, db: web::Data<crate::DbPool>) -> impl Responder {
-    let mut conn = db.get().expect("no connection available");
-    let users = User::list(&mut conn);
+    let users = User::list(&db).await;
     let template = UserListTemplate { users };
     HttpResponse::Ok().body(template.render().unwrap())
 }

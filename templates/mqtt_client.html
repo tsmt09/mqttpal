@@ -5,7 +5,7 @@
 </div>
 
 <div class="box">
-  <form hx-post="/mqtt_client/{{ id }}/publish" hx-target="#responseBox">
+  <form hx-post="/mqtt_client/{{ name }}/publish" hx-target="#responseBox">
     <label for="topic">Topic</label>
     <input id="topic" type="text" name="topic">
     <label for="payload">Payload</label>
@@ -19,7 +19,7 @@
 </div>
 
 <div class="box">
-  <form method="get" action="{{ id }}/subscribe">
+  <form method="get" action="{{ name }}/subscribe">
     <label for="topic">Topic</label>
     <input id="topic" type="text" name="topic">
     <div class="right">

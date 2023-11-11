@@ -22,8 +22,7 @@ pub struct MqttClientListTemplate {
 
 #[get("/")]
 async fn get(_: LoginGuard, db: web::Data<crate::DbPool>) -> impl Responder {
-    let mut conn = db.get().expect("no connection available");
-    let mqtt_clients = MqttClient::list(&mut conn);
+    let mqtt_clients = MqttClient::list(&db).await;
     let template = MqttClientListTemplate { mqtt_clients };
     HttpResponse::Ok().body(template.render().unwrap())
 }

@@ -1,4 +1,4 @@
-<form hx-put="/user/{{ user.id }}" hx-target="#resultContainer">
+<form hx-post="/user/" hx-target="#resultContainer">
   <label for="name">Username</label>
   <input id="name" name="name" value="{{ user.name }}">
   <label for="email">E-Mail</label>
@@ -17,7 +17,7 @@
       </div>
     </div>
     <div class="float:right">
-      <button class="bad bg border" hx-delete="/user/{{ user.id }}" hx-target="#mainWindow" hx-confirm="Are you sure to delete {{ user.name }}?">Delete</button>
+      <button class="bad bg border" hx-delete="/user/{{ user.name }}" hx-target="#mainWindow" hx-confirm="Are you sure to delete {{ user.name }}?">Delete</button>
     </div>
   </div>
 </form>
