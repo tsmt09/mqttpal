@@ -1,6 +1,10 @@
-use crate::{middleware::fullpage_render::FullPageRender, mqtt::{MqttMessage, MqttClientActor}};
-use actix::{Actor, Handler, StreamHandler, System, AsyncContext, Addr};
-use actix_web::{web, Error, HttpRequest, HttpResponse};
+use crate::{
+    middleware::{fullpage_render::FullPageRender, login_guard::LoginGuard},
+    models::mqtt_client::MqttClient,
+    mqtt::{MqttClientActor, MqttClientManager, MqttMessage},
+};
+use actix::{Actor, Addr, AsyncContext, Handler, StreamHandler, System};
+use actix_web::{web, Error, HttpRequest, HttpResponse, Responder};
 use actix_web_actors::ws::{self, CloseReason};
 use askama::Template;
 use serde::{Deserialize, Serialize};
@@ -16,7 +20,11 @@ pub fn subscribe_scoped(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("{name}/subscribe")
             .service(web::resource("/ws").route(web::get().to(ws)))
-            .service(web::resource("").route(web::get().to(get).wrap(FullPageRender))),
+            .service(
+                web::resource("")
+                    .route(web::delete().to(post_unsubscribe))
+                    .route(web::post().to(post_subscribe)),
+            ),
     );
 }
 
@@ -29,6 +37,13 @@ impl Actor for WsSubscription {
     }
 }
 
+#[derive(Template)]
+#[template(path = "mqtt_message.html")]
+struct MessageTemplate {
+    topic: String,
+    payload: String,
+}
+
 impl Handler<MqttMessage> for WsSubscription {
     type Result = ();
     fn handle(&mut self, msg: MqttMessage, ctx: &mut Self::Context) -> Self::Result {
@@ -39,12 +54,12 @@ impl Handler<MqttMessage> for WsSubscription {
                 let payload = String::from_utf8(publsh.payload.into()).unwrap();
                 let response = MessageTemplate { topic, payload }.render().unwrap();
                 ctx.text(response);
-            },
+            }
             MqttMessage::Disconnect => {
                 log::info!("Disconnect from mqtt manager!");
                 ctx.close(None);
-            },
-            _ => ()
+            }
+            _ => (),
         }
     }
 }
@@ -76,7 +91,7 @@ async fn ws(
             WsSubscription {
                 client_name: name.clone(),
                 ws_id,
-                addr
+                addr,
             },
             &req,
             stream,
@@ -86,25 +101,50 @@ async fn ws(
     }
 }
 
-#[derive(Template)]
-#[template(path = "subscribe.html")]
-struct SubscriptionTemplate {
-    name: String,
-}
-
-#[derive(Template)]
-#[template(path = "mqtt_message.html")]
-struct MessageTemplate {
+#[derive(Serialize, Deserialize, Debug)]
+struct MqttClientSubQuery {
     topic: String,
-    payload: String,
 }
 
-async fn get(name: web::Path<String>) -> HttpResponse {
-    HttpResponse::Ok().body(
-        SubscriptionTemplate {
-            name: name.clone(),
-        }
-        .render()
-        .unwrap(),
-    )
+#[derive(Template)]
+#[template(path = "mqtt_client_subs.html")]
+struct MqttClientSubTemplate {
+    name: String,
+    topics: Vec<String>,
+}
+
+async fn post_subscribe(
+    _: LoginGuard,
+    db: web::Data<crate::DbPool>,
+    mqtt: web::Data<MqttClientManager>,
+    form: web::Form<MqttClientSubQuery>,
+    name: web::Path<String>,
+) -> impl Responder {
+    let topic = form.into_inner().topic;
+    let _ = mqtt.subscribe(&name, &topic).await;
+    MqttClient::subscribe(&db, &name, &topic).await;
+    let topics = MqttClient::topics(&db, &name).await;
+    let template = MqttClientSubTemplate {
+        name: name.into_inner(),
+        topics,
+    };
+    HttpResponse::Ok().body(template.render().unwrap())
+}
+
+async fn post_unsubscribe(
+    _: LoginGuard,
+    db: web::Data<crate::DbPool>,
+    mqtt: web::Data<MqttClientManager>,
+    query: web::Query<MqttClientSubQuery>,
+    name: web::Path<String>,
+) -> impl Responder {
+    let topic = query.into_inner().topic;
+    let _ = mqtt.unsubscribe(&name, &topic).await;
+    MqttClient::unsubscribe(&db, &name, &topic).await;
+    let topics = MqttClient::topics(&db, &name).await;
+    let template = MqttClientSubTemplate {
+        name: name.into_inner(),
+        topics,
+    };
+    HttpResponse::Ok().body(template.render().unwrap())
 }

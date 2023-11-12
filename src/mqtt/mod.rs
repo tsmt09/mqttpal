@@ -95,6 +95,7 @@ impl MqttClientManager {
         &self,
         client_name: String,
         mqtt_url: String,
+        topics: Vec<String>,
     ) -> Result<(), Box<dyn std::error::Error>> {
         log::info!("registering client {} with url {}", client_name, mqtt_url);
         let mqtt_url = if !mqtt_url.contains("?client_id") {
@@ -105,7 +106,9 @@ impl MqttClientManager {
         let mut options = MqttOptions::parse_url(&mqtt_url)?;
         options.set_max_packet_size(100000, 100000);
         let (client, mut eventloop) = AsyncClient::new(options, 10);
-        client.subscribe("#", QoS::ExactlyOnce).await;
+        for topic in topics {
+            client.subscribe(&topic, QoS::AtLeastOnce).await?;
+        }
         let cid = client_name.clone();
         let addr_handle = MqttClientActor { ws_subs: HashMap::new() }.start();
         let addr = addr_handle.clone();
@@ -157,14 +160,26 @@ impl MqttClientManager {
     }
     #[allow(dead_code)]
     pub async fn subscribe(
-        &mut self,
-        client_name: String,
-        topic: String,
+        &self,
+        client_name: &String,
+        topic: &String,
     ) -> Result<(), Box<dyn std::error::Error>> {
         log::info!("Subscribing client: {} to topic: {}", client_name, topic);
         let mut clients = self.clients.lock().await;
-        let client = clients.get_mut(&client_name).unwrap();
+        let client = clients.get_mut(client_name).unwrap();
         client.client.subscribe(topic, QoS::AtLeastOnce).await?;
+        Ok(())
+    }
+    #[allow(dead_code)]
+    pub async fn unsubscribe(
+        &self,
+        client_name: &String,
+        topic: &String,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        log::info!("Unsubscribing client: {} to topic: {}", client_name, topic);
+        let mut clients = self.clients.lock().await;
+        let client = clients.get_mut(client_name).unwrap();
+        client.client.unsubscribe(topic).await?;
         Ok(())
     }
     pub async fn connected(&self, client_name: &String) -> bool {

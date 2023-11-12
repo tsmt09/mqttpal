@@ -10,13 +10,13 @@ use askama::Template;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug)]
-struct MqttClientForm {
+struct NewMqttClientForm {
     name: String,
     url: String,
 }
 
-impl From<MqttClientForm> for MqttClient {
-    fn from(form: MqttClientForm) -> Self {
+impl From<NewMqttClientForm> for MqttClient {
+    fn from(form: NewMqttClientForm) -> Self {
         MqttClient {
             name: form.name,
             url: form.url,
@@ -34,7 +34,7 @@ pub fn client_scoped(cfg: &mut web::ServiceConfig) {
                     .route(web::delete().to(delete)),
             )
             .service(web::resource("/").route(web::post().to(post)))
-            .service(web::resource("/{id}/publish").route(web::post().to(post_publish))),
+            .service(web::resource("/{id}/publish").route(web::post().to(post_publish)))
     );
 }
 
@@ -42,11 +42,11 @@ async fn post(
     _: LoginGuard,
     db: web::Data<crate::DbPool>,
     mqtt: web::Data<MqttClientManager>,
-    form: web::Form<MqttClientForm>,
+    form: web::Form<NewMqttClientForm>,
 ) -> impl Responder {
     let client: MqttClient = form.into_inner().into();
     client.insert(&db).await;
-    let _ = mqtt.register_client(client.name, client.url).await;
+    let _ = mqtt.register_client(client.name, client.url, vec![]).await;
     let mqtt_clients = MqttClient::list(&db).await;
     let template = MqttClientListTemplate { mqtt_clients };
     HttpResponse::Ok().body(template.render().unwrap())
@@ -71,6 +71,7 @@ async fn delete(
 #[template(path = "mqtt_client.html")]
 struct MqttClientTemplate {
     name: String,
+    topics: Vec<String>,
     uri: String,
     connected: bool,
 }
@@ -83,10 +84,12 @@ async fn get(
     name: web::Path<String>,
 ) -> impl Responder {
     let db_client = MqttClient::get_by_name(&db, &name).await;
+    let topics = MqttClient::topics(&db, &name).await;
     if let Some(db_client) = db_client {
         let template = MqttClientTemplate {
             name: db_client.name.clone(),
             uri: db_client.url.clone(),
+            topics,
             connected: mqtt.connected(&db_client.name).await,
         };
         HttpResponse::Ok().body(template.render().unwrap())

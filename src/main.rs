@@ -1,5 +1,8 @@
+use std::vec;
+
 use crate::middleware::fullpage_render::FullPageRender;
 use crate::middleware::user_session::UserSession;
+use crate::models::mqtt_client::MqttClient;
 use crate::models::user::Role;
 use actix::System;
 use actix_files::NamedFile;
@@ -150,9 +153,10 @@ async fn main() -> std::io::Result<()> {
         CliCommands::Serve => {
             let mqtt_manager = mqtt::MqttClientManager::new();
             let session_key = get_session_key();
-            let clients = models::mqtt_client::MqttClient::list(&pool).await;
+            let clients = MqttClient::list(&pool).await;
             for client in clients {
-                mqtt_manager.register_client(client.name, client.url).await.unwrap();
+                let topics = MqttClient::topics(&pool, &client.name).await;
+                mqtt_manager.register_client(client.name, client.url, topics).await.unwrap();
             }
             log::info!("Current Actix System: {}", System::id(&System::try_current().unwrap()));
             HttpServer::new(move || {

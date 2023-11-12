@@ -1,0 +1,36 @@
+<div class="box" id="subscriptions">
+    <h2>
+        Subscribed Topics
+    </h2>
+    <div class="container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Topic</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for topic in topics %}
+                <tr>
+                    <td>{{ topic }}</td>
+                    <td>
+                        <button class="delete bg border" hx-delete="/mqtt_client/{{ name }}/subscribe?topic={{ topic|urlencode }}" hx-target="#subscriptions" hx-swap="outerHTML">Unsubscribe</button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="container">
+        <form hx-post="/mqtt_client/{{ name }}/subscribe" hx-target="#subscriptions" hx-swap="outerHTML">
+            <label for="topic">Topic</label>
+            <input id="topic" type="text" name="topic">
+            <div class="right">
+                <button type="submit" class="ok bg border">Add Subscription</button>
+            </div>
+        </form>
+        <form hx-post="/mqtt_client/{{ name }}/unsubscribe">
+        </form>
+    </div>
+</div>

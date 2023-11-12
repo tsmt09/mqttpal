@@ -1,25 +1,33 @@
 <div class="box">
-  Name: {{ name }} <br/>
-  Connection Url: {{ uri }} <br/>
-  Connection Status: {% if connected %} Connected {% else %} Disconnected {% endif %} <br/>
+    Name: {{ name }} <br />
+    Connection Url: {{ uri }} <br />
+    Connection Status: {% if connected %} Connected {% else %} Disconnected {% endif %} <br />
 </div>
+
+{% include "mqtt_client_subs.html" %}
 
 <div class="box">
-  <form hx-post="/mqtt_client/{{ name }}/publish" hx-target="#responseBox">
-    <label for="topic">Topic</label>
-    <input id="topic" type="text" name="topic">
-    <label for="payload">Payload</label>
-    <input type="text" id="payload" name="payload">
-    <div class="right">
-      <button type="submit" class="ok bg border">Publish</button>
+    <h2>
+        Publish to {{ name }}
+    </h2>
+    <form hx-post="/mqtt_client/{{ name }}/publish" hx-target="#responseBox">
+        <label for="topic">Topic</label>
+        <input id="topic" type="text" name="topic">
+        <label for="payload">Payload</label>
+        <input type="text" id="payload" name="payload">
+        <div class="right">
+            <button type="submit" class="ok bg border">Publish</button>
+        </div>
+    </form>
+    <div id="responseBox">
     </div>
-  </form>
-  <div id="responseBox">
-  </div>
 </div>
-
-MQTT Traffic for {{ name }}
-<div hx-ext="ws" ws-connect="/mqtt_client/{{ name }}/subscribe/ws" hx-target="#responseBox">
-  <div id="mqtt_messages">
-  </div>
+<div class="box">
+    <h2>
+        MQTT Traffic for {{ name }}
+    </h2>
+    <div hx-ext="ws" ws-connect="/mqtt_client/{{ name }}/subscribe/ws">
+        <div id="mqtt_messages">
+        </div>
+    </div>
 </div>
