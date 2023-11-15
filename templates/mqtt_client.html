@@ -22,12 +22,19 @@
     <div id="responseBox">
     </div>
 </div>
+
 <div class="box">
     <h2>
-        MQTT Traffic for {{ name }}
+        MQTT Traffic table for {{ name }}
     </h2>
     <div hx-ext="ws" ws-connect="/mqtt_client/{{ name }}/subscribe/ws">
-        <div id="mqtt_messages">
-        </div>
+        <table>
+            <thead>
+                <th>Topic</th>
+                <th>Name</th>
+            </thead>
+            <tbody id="mqttMessages">
+            </tbody>
+        </table>
     </div>
 </div>
