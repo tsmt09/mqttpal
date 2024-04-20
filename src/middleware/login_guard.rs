@@ -10,6 +10,7 @@ impl FromRequest for LoginGuard {
 
     fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
         if let Ok(session) = Session::extract(req).into_inner() {
+            log::debug!("{:?}", session.entries());
             if let Ok(Some(loggedin)) = session.get::<String>("loggedin") {
                 if loggedin == "true" {
                     return futures_util::future::ready(Ok(LoginGuard));

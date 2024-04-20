@@ -17,13 +17,16 @@ base64 = "0.21.2"
 futures-util = "0.3.28"
 askama = "0.12.0"
 dotenv = "0.15.0"
-tokio = "1.32.0"
+tokio = { version = "1.32.0", features = ["full"] }
 serde = { version = "1.0.171", features = ["derive"] }
+serde_yaml = "0.9.34"
+serde_json = "1.0.108"
 chrono = "0.4.26"
 clap = { version = "4.3.19", features = ["derive"] }
 rumqttc = { version = "0.22.0", features = ["url"] }
 redis = { version = "0.23.3", features = ["r2d2", "aio", "cluster-async", "tokio-comp", "keep-alive"] }
 bb8 = "0.8.1"
 bb8-redis = "0.13.1"
-serde_json = "1.0.108"
 rand = "0.8.5"
+openidconnect = { version = "3.5", features = ["reqwest"] }
+anyhow = "1.0.82"

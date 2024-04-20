@@ -4,6 +4,7 @@ use crate::{
         user_session::UserSession,
     },
     models::user::User,
+    oauth::OauthConfigs,
 };
 use actix_session::Session;
 use actix_web::{web, HttpMessage, HttpRequest, HttpResponse, Responder};
@@ -32,9 +33,14 @@ struct LoginForm {
 pub struct LoginTemplate {
     pub hx: bool,
     pub user: Option<String>,
+    pub configs: Vec<(String, String)>,
 }
 
-async fn get(req: HttpRequest, usersession: UserSession) -> impl Responder {
+async fn get(req: HttpRequest, usersession: UserSession, configs: OauthConfigs) -> impl Responder {
+    let configs: Vec<(String, String)> = configs
+        .iter()
+        .map(|(k, v)| (k.clone(), v.ui_name.clone()))
+        .collect();
     let template = if let Some(htmx) = req.extensions_mut().get_mut::<HtmxHeaders>() {
         log::debug!("Is htmx req? {}", htmx.request());
         if htmx.request() {
@@ -44,11 +50,13 @@ async fn get(req: HttpRequest, usersession: UserSession) -> impl Responder {
         LoginTemplate {
             hx: htmx.request(),
             user: usersession.username,
+            configs,
         }
     } else {
         LoginTemplate {
             hx: false,
             user: usersession.username,
+            configs,
         }
     };
     HttpResponse::Ok().body(template.render().unwrap())
@@ -72,7 +80,13 @@ async fn post(
     session: Session,
 ) -> impl Responder {
     log::debug!("User: {form:?}");
-    let is_user = User::check(&db, &form.name, &form.password).await;
+    let is_user = User::check(
+        &db,
+        &form.name,
+        &form.password,
+        crate::models::user::UserSource::Local,
+    )
+    .await;
     if is_user {
         let _ = session.insert("loggedin", "true");
         let _ = session.insert("username", &form.name);

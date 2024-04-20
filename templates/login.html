@@ -15,4 +15,14 @@
   </div>
   <button type="submit">Login</button>
 </form>
+<h2>OAuth2 Logins</h2>
+<div>
+  <ul>
+    {% for (url, name) in configs %}
+    <li>
+      <a href="/oauth/{{ url }}/" class="btn">Sign in with {{ name }}</a>
+    </li>
+    {% endfor %}
+  </ul>
+</div>
 <div id="form-errors"></div>

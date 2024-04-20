@@ -34,7 +34,7 @@ pub fn client_scoped(cfg: &mut web::ServiceConfig) {
                     .route(web::delete().to(delete)),
             )
             .service(web::resource("/").route(web::post().to(post)))
-            .service(web::resource("/{id}/publish").route(web::post().to(post_publish)))
+            .service(web::resource("/{id}/publish").route(web::post().to(post_publish))),
     );
 }
 

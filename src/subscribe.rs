@@ -1,17 +1,17 @@
 use crate::{
-    middleware::{fullpage_render::FullPageRender, login_guard::LoginGuard},
+    middleware::login_guard::LoginGuard,
     models::mqtt_client::MqttClient,
     mqtt::{MqttClientActor, MqttClientManager, MqttMessage},
 };
-use actix::{Actor, Addr, AsyncContext, Handler, StreamHandler, System};
+use actix::{Actor, Addr, AsyncContext, Handler, StreamHandler};
 use actix_web::{web, Error, HttpRequest, HttpResponse, Responder};
-use actix_web_actors::ws::{self, CloseReason};
+use actix_web_actors::ws::{self};
 use askama::Template;
 use serde::{Deserialize, Serialize};
 
 /// Define HTTP actor
 struct WsSubscription {
-    client_name: String,
+    _client_name: String,
     ws_id: i32,
     addr: Addr<MqttClientActor>,
 }
@@ -89,7 +89,7 @@ async fn ws(
     if let Some(addr) = mqtt_clients.get_client_actor_addr(&name).await {
         ws::start(
             WsSubscription {
-                client_name: name.clone(),
+                _client_name: name.clone(),
                 ws_id,
                 addr,
             },

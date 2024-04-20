@@ -1,15 +1,15 @@
 use std::{collections::HashMap, sync::Arc};
 
-use actix::{Actor, Context, Message, Recipient, System, Addr, Handler, ActorContext};
-use rumqttc::{AsyncClient, Event, MqttOptions, QoS, Disconnect, Publish, Packet, valid_topic};
+use actix::{Actor, ActorContext, Addr, Context, Handler, Message, Recipient};
+use rumqttc::{AsyncClient, Event, MqttOptions, Packet, Publish, QoS};
 use tokio::{sync::Mutex, task::JoinHandle};
 
 #[derive(Debug, Clone)]
 pub enum MqttMessage {
     Message(Publish),
-    Sub((i32,Recipient<MqttMessage>)),
+    Sub((i32, Recipient<MqttMessage>)),
     Unsub(i32),
-    Disconnect
+    Disconnect,
 }
 
 impl Message for MqttMessage {
@@ -17,7 +17,7 @@ impl Message for MqttMessage {
 }
 
 pub struct MqttClientActor {
-    ws_subs: HashMap<i32, Recipient<MqttMessage>>
+    ws_subs: HashMap<i32, Recipient<MqttMessage>>,
 }
 
 impl MqttClientActor {
@@ -31,7 +31,6 @@ impl MqttClientActor {
 
 impl Actor for MqttClientActor {
     type Context = Context<Self>;
-
 }
 
 impl Handler<MqttMessage> for MqttClientActor {
@@ -39,19 +38,22 @@ impl Handler<MqttMessage> for MqttClientActor {
     fn handle(&mut self, msg: MqttMessage, ctx: &mut Self::Context) -> Self::Result {
         match msg {
             MqttMessage::Message(_) => {
-                log::info!("distributing message within {} ws clients", self.ws_subs.len());
-                for (_, addr) in &self.ws_subs {
-                    let _ = addr.do_send(msg.clone());
+                log::info!(
+                    "distributing message within {} ws clients",
+                    self.ws_subs.len()
+                );
+                for addr in self.ws_subs.values() {
+                    addr.do_send(msg.clone());
                 }
-            },
+            }
             MqttMessage::Sub((ws_id, addr)) => {
                 log::info!("Registering ws_id: {} for mqtt messages", ws_id);
                 self.reg_ws_sub(ws_id, addr);
-            },
+            }
             MqttMessage::Unsub(ws_id) => {
                 log::info!("Unregistering ws_id: {} for mqtt messages", ws_id);
                 self.reg_ws_unsub(ws_id);
-            },
+            }
             MqttMessage::Disconnect => {
                 log::info!("Stopping Actor!");
                 ctx.stop()
@@ -85,7 +87,10 @@ impl MqttClientManager {
         }
     }
 
-    pub async fn get_client_actor_addr(&self, client_name: &String) -> Option<Addr<MqttClientActor>> {
+    pub async fn get_client_actor_addr(
+        &self,
+        client_name: &String,
+    ) -> Option<Addr<MqttClientActor>> {
         let clients = self.clients.lock().await;
         let client = clients.get(client_name)?;
         Some(client.addr.clone())
@@ -101,7 +106,7 @@ impl MqttClientManager {
         let mqtt_url = if !mqtt_url.contains("?client_id") {
             format!("{}?client_id={}", mqtt_url, client_name)
         } else {
-            mqtt_url 
+            mqtt_url
         };
         let mut options = MqttOptions::parse_url(&mqtt_url)?;
         options.set_max_packet_size(100000, 100000);
@@ -110,7 +115,10 @@ impl MqttClientManager {
             client.subscribe(&topic, QoS::AtLeastOnce).await?;
         }
         let cid = client_name.clone();
-        let addr_handle = MqttClientActor { ws_subs: HashMap::new() }.start();
+        let addr_handle = MqttClientActor {
+            ws_subs: HashMap::new(),
+        }
+        .start();
         let addr = addr_handle.clone();
         let handle = tokio::spawn(async move {
             log::info!("Client {} connected!", cid);
@@ -120,24 +128,23 @@ impl MqttClientManager {
                     Ok(Event::Incoming(inc)) => match inc {
                         Packet::Publish(publish) => {
                             log::info!("Client {} got message: {:?}", cid, publish);
-                            addr_handle.send(MqttMessage::Message(publish)).await;
-                        },
+                            let _ = addr_handle.send(MqttMessage::Message(publish)).await;
+                        }
                         Packet::ConnAck(_) => {
                             log::info!("Client {} got ConnAck", cid);
-                        },
+                        }
                         Packet::Disconnect => {
                             log::info!("Server sent Disconnect");
-                            addr_handle.send(MqttMessage::Disconnect).await;
+                            let _ = addr_handle.send(MqttMessage::Disconnect).await;
                             break;
                         }
                         _ => {}
                     },
-                    Ok(Event::Outgoing(out)) => match out {
-                        rumqttc::Outgoing::Disconnect => {
+                    Ok(Event::Outgoing(out)) => {
+                        if out == rumqttc::Outgoing::Disconnect {
                             log::info!("Client {} sent Disconnect", cid);
-                        },
-                        _ => {}
-                    },
+                        }
+                    }
                     Err(e) => {
                         log::info!("Client {} got error: {:?}", cid, e);
                         break;
@@ -146,7 +153,11 @@ impl MqttClientManager {
             }
         });
 
-        let mqtt_client = MqttClient { client, handle, addr };
+        let mqtt_client = MqttClient {
+            client,
+            handle,
+            addr,
+        };
         self.clients.lock().await.insert(client_name, mqtt_client);
         Ok(())
     }

@@ -1,0 +1,9 @@
+# You can list multiple OAuth Providers here
+# "Sign in with Google" and link to `localhost:8080/oauth/google/`
+#               ^ ui_name                                  ^ section key (google)
+google:
+  ui_name: Google
+  issuer: "https://accounts.google.com"
+  client_id: ""
+  client_secret: ""
+  scope: "openid email profile"

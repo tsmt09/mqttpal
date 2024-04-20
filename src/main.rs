@@ -1,4 +1,4 @@
-use std::vec;
+use std::collections::HashMap;
 
 use crate::middleware::fullpage_render::FullPageRender;
 use crate::middleware::user_session::UserSession;
@@ -8,7 +8,6 @@ use actix::System;
 use actix_files::NamedFile;
 use actix_session::{storage::CookieSessionStore, Session, SessionMiddleware};
 use actix_web::{cookie::Key, get, web, App, HttpResponse, HttpServer, Responder};
-use askama::Template;
 use base64::Engine;
 use bb8::Pool;
 use bb8_redis::RedisMultiplexedConnectionManager;
@@ -16,6 +15,7 @@ use clap::Args;
 use clap::Parser;
 use clap::Subcommand;
 use middleware::htmx::Htmx;
+use oauth::OauthConfigs;
 
 mod login;
 mod middleware;
@@ -23,6 +23,7 @@ mod models;
 mod mqtt;
 mod mqtt_client;
 mod mqtt_clients;
+mod oauth;
 mod subscribe;
 mod user;
 mod users;
@@ -63,13 +64,12 @@ struct CliArgs {
 #[get("/")]
 async fn index(usession: UserSession) -> impl Responder {
     if usession.username.is_some() {
-        return HttpResponse::Ok().body("<h1> TODO </h1>");
+        HttpResponse::Ok().body("<h1> TODO </h1>")
+    } else {
+        HttpResponse::TemporaryRedirect()
+            .append_header(("Location", "/login/"))
+            .finish()
     }
-    let local_login = login::LoginTemplate {
-        hx: false,
-        user: usession.username,
-    };
-    HttpResponse::Ok().body(local_login.render().unwrap())
 }
 
 #[get("/favicon.ico")]
@@ -95,6 +95,14 @@ fn get_session_key() -> Key {
             .decode(key)
             .expect("cannot decode base64 SESSION_KEY"),
     )
+}
+
+fn get_oauth_configs() -> anyhow::Result<OauthConfigs> {
+    let Some(file) = std::env::var("OAUTH_FILE").ok() else {
+        return Ok(web::Data::new(HashMap::new()));
+    };
+    let file = std::fs::File::open(file)?;
+    Ok(web::Data::new(serde_yaml::from_reader(file)?))
 }
 
 #[actix_web::main]
@@ -134,6 +142,7 @@ async fn main() -> std::io::Result<()> {
                 password: user.password,
                 email: user.email,
                 role_id: user.role_id.unwrap_or(Role::Admin as i32),
+                source: models::user::UserSource::Local,
             };
             user.insert(&pool).await;
             log::info!("Inserted User: {}", user.name);
@@ -154,15 +163,23 @@ async fn main() -> std::io::Result<()> {
             let mqtt_manager = mqtt::MqttClientManager::new();
             let session_key = get_session_key();
             let clients = MqttClient::list(&pool).await;
+            let oauth_cfg = get_oauth_configs().unwrap();
             for client in clients {
                 let topics = MqttClient::topics(&pool, &client.name).await;
-                mqtt_manager.register_client(client.name, client.url, topics).await.unwrap();
+                mqtt_manager
+                    .register_client(client.name, client.url, topics)
+                    .await
+                    .unwrap();
             }
-            log::info!("Current Actix System: {}", System::id(&System::try_current().unwrap()));
+            log::info!(
+                "Current Actix System: {}",
+                System::id(&System::try_current().unwrap())
+            );
             HttpServer::new(move || {
                 App::new()
                     .app_data(web::Data::new(pool.clone()))
                     .app_data(web::Data::new(mqtt_manager.clone()))
+                    .app_data(web::Data::clone(&oauth_cfg))
                     .wrap(actix_web::middleware::Logger::default())
                     .wrap(SessionMiddleware::new(
                         CookieSessionStore::default(),
@@ -173,6 +190,7 @@ async fn main() -> std::io::Result<()> {
                     .service(actix_files::Files::new("/css/", "static/css/"))
                     .service(actix_files::Files::new("/js/", "static/js/"))
                     .service(favicon)
+                    .configure(oauth::oauth_login_scoped)
                     .configure(login::login_scoped)
                     .configure(users::users_scoped)
                     .configure(user::user_scoped)

@@ -11,10 +11,7 @@ use crate::{
 pub fn user_scoped(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/user")
-            .service(
-                web::resource("/{id}")
-                    .route(web::delete().to(delete))
-            )
+            .service(web::resource("/{id}").route(web::delete().to(delete)))
             .service(
                 web::resource("/{id}/edit").route(web::get().to(get_edit).wrap(FullPageRender)),
             )
@@ -54,6 +51,7 @@ impl From<UserForm> for User {
             password: form.password,
             email: form.email,
             role_id: form.role_id.unwrap_or(Role::User as i32),
+            source: crate::models::user::UserSource::Local,
         }
     }
 }
