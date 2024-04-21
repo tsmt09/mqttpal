@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use crate::middleware::fullpage_render::FullPageRender;
 use crate::middleware::user_session::UserSession;
 use crate::models::mqtt_client::MqttClient;
@@ -15,7 +13,6 @@ use clap::Args;
 use clap::Parser;
 use clap::Subcommand;
 use middleware::htmx::Htmx;
-use oauth::OauthConfigs;
 
 mod login;
 mod middleware;
@@ -58,7 +55,7 @@ struct CreateClientArgs {
 struct CliArgs {
     // command used (default "server")
     #[command(subcommand)]
-    command: CliCommands,
+    command: Option<CliCommands>,
 }
 
 #[get("/")]
@@ -97,14 +94,6 @@ fn get_session_key() -> Key {
     )
 }
 
-fn get_oauth_configs() -> anyhow::Result<OauthConfigs> {
-    let Some(file) = std::env::var("OAUTH_FILE").ok() else {
-        return Ok(web::Data::new(HashMap::new()));
-    };
-    let file = std::fs::File::open(file)?;
-    Ok(web::Data::new(serde_yaml::from_reader(file)?))
-}
-
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     dotenv::dotenv().ok();
@@ -121,7 +110,7 @@ async fn main() -> std::io::Result<()> {
         .build(manager)
         .await
         .expect("Cannot create redis pool");
-    match cli.command {
+    match cli.command.unwrap_or(CliCommands::Serve) {
         CliCommands::CreateSessionKey => {
             log::info!("Generating session key");
             let key = create_session_key();
@@ -163,7 +152,7 @@ async fn main() -> std::io::Result<()> {
             let mqtt_manager = mqtt::MqttClientManager::new();
             let session_key = get_session_key();
             let clients = MqttClient::list(&pool).await;
-            let oauth_cfg = get_oauth_configs().unwrap();
+            let oauth_cfg = oauth::get_oauth_configs().await.unwrap();
             for client in clients {
                 let topics = MqttClient::topics(&pool, &client.name).await;
                 mqtt_manager

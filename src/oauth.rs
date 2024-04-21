@@ -1,3 +1,4 @@
+use core::panic;
 use std::collections::HashMap;
 
 use actix_session::Session;
@@ -13,7 +14,7 @@ use openidconnect::{
     AccessToken, AuthenticationFlow, AuthorizationCode, ClientId, ClientSecret, CsrfToken,
     IssuerUrl, Nonce, OAuth2TokenResponse, RedirectUrl, Scope, TokenResponse,
 };
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 use crate::models::user::User;
 
@@ -28,6 +29,10 @@ pub struct OauthConfig {
     pub scope: String,
     #[serde(default)]
     pub username_field: UsernameField,
+    #[serde(skip)]
+    pub name: Option<String>,
+    #[serde(skip)]
+    pub client: Option<CoreClient>,
 }
 
 #[derive(Default, Deserialize, Debug)]
@@ -37,41 +42,113 @@ pub enum UsernameField {
     Email,
 }
 
+impl OauthConfig {
+    pub async fn init(&mut self, name: String, redirect_uri: String) {
+        log::info!("Initializing Oauth config {name}");
+        self.name = Some(name);
+        // define OIDC Parameters
+        let issuer = IssuerUrl::new(self.issuer.clone()).unwrap();
+        let client_id = ClientId::new(self.client_id.clone());
+        let client_secret = ClientSecret::new(self.client_secret.clone());
+
+        // discover metadata from issuer
+        let metadata = CoreProviderMetadata::discover_async(issuer, async_http_client)
+            .await
+            .unwrap();
+
+        // create client from metadata
+        let client = CoreClient::from_provider_metadata(metadata, client_id, Some(client_secret))
+            .set_redirect_uri(RedirectUrl::new(redirect_uri).unwrap());
+        self.client = Some(client);
+    }
+
+    async fn get_auth_url(&self) -> String {
+        let Some(client) = &self.client else {
+            panic!("OidcClient needs to be initialized before usage");
+        };
+        // get authorize_url
+        let (auth_url, _, _) = client
+            .authorize_url(
+                AuthenticationFlow::<CoreResponseType>::AuthorizationCode,
+                CsrfToken::new_random,
+                Nonce::new_random,
+            )
+            .add_scope(Scope::new(self.scope.clone()))
+            .url();
+        auth_url.to_string()
+    }
+    async fn exchange_code_for_token(&self, code: String) -> anyhow::Result<CoreTokenResponse> {
+        // define OIDC Parameters
+        let Some(client) = &self.client else {
+            panic!("OidcClient needs to be initialized before usage");
+        };
+        // exchange provided code for auth token
+        let token = match client
+            .exchange_code(AuthorizationCode::new(code))
+            .request_async(async_http_client)
+            .await
+        {
+            Ok(token) => token,
+            Err(e) => {
+                log::error!("{:?}", e);
+                return Err(e.into());
+            }
+        };
+        Ok(token)
+    }
+    async fn fetch_user_info(
+        &self,
+        access_token: AccessToken,
+    ) -> Result<CoreUserInfoClaims, Box<dyn std::error::Error>> {
+        // define OIDC Parameters
+        let Some(client) = &self.client else {
+            panic!("OidcClient needs to be initialized before usage");
+        };
+        // Fetch user info using the access token
+        let user_info = client
+            .user_info(access_token, None)
+            .unwrap()
+            .request_async(async_http_client)
+            .await?;
+
+        Ok(user_info)
+    }
+}
+
+pub async fn get_oauth_configs() -> anyhow::Result<OauthConfigs> {
+    let hostname = std::env::var("WEB_HOSTNAME").unwrap_or("localhost:8080".into());
+    let Some(file) = std::env::var("OAUTH_FILE").ok() else {
+        return Ok(web::Data::new(HashMap::new()));
+    };
+    let file = std::fs::File::open(file)?;
+    let mut configs: HashMap<String, OauthConfig> = serde_yaml::from_reader(file)?;
+    for (name, config) in configs.iter_mut() {
+        let redirect_uri = format!("http://{}/oauth/{}/callback", &hostname, &name);
+        config.init(name.clone(), redirect_uri).await;
+    }
+    Ok(web::Data::new(configs))
+}
+
 pub fn oauth_login_scoped(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("oauth/{config_name}")
             .service(web::resource("/").route(web::get().to(oauth_login)))
-            .service(web::resource("/callback").route(web::get().to(google_auth_callback_handler))),
+            .service(web::resource("/callback").route(web::get().to(auth_callback_handler))),
     );
 }
 
-pub async fn oauth_login(
-    req: HttpRequest,
-    config_name: Path<String>,
-    configs: OauthConfigs,
-) -> impl Responder {
+pub async fn oauth_login(config_name: Path<String>, configs: OauthConfigs) -> impl Responder {
     let config_name = config_name.into_inner();
     let Some(config) = configs.get(&config_name) else {
         return HttpResponse::NotFound().body("cannot find desired oauth configuration");
     };
-    let redirect_uri = format!(
-        // TODO: use correct protocol here
-        "http://{}/oauth/{}/callback",
-        req.connection_info().host(),
-        &config_name
-    );
-    log::info!(
-        "Logging in user on oauth provider {} with redirect uri: {}",
-        &config_name,
-        &redirect_uri
-    );
-    let auth_url = get_auth_url(config, redirect_uri).await;
+    let auth_url = config.get_auth_url().await;
     HttpResponse::Found()
         .append_header(("Location", auth_url.as_str()))
         .finish()
 }
 
-pub async fn google_auth_callback_handler(
+pub async fn auth_callback_handler(
     db: web::Data<crate::DbPool>,
     req: HttpRequest,
     config_name: Path<String>,
@@ -98,8 +175,7 @@ pub async fn google_auth_callback_handler(
     );
     log::debug!("{:?}", params);
     // Exchange the authorization code for an access token
-    let token_response =
-        exchange_code_for_token(config, redirect_uri.clone(), params.code.clone()).await;
+    let token_response = config.exchange_code_for_token(params.code.clone()).await;
 
     match token_response {
         Ok(token_response) => {
@@ -109,7 +185,7 @@ pub async fn google_auth_callback_handler(
             let Ok(id_token_json) = serde_json::to_string(&token_response.id_token()) else {
                 return HttpResponse::InternalServerError().body("unable to serialize id_token");
             };
-            let user_info = fetch_user_info(config, redirect_uri, token).await.unwrap();
+            let user_info = config.fetch_user_info(token).await.unwrap();
             log::info!("{:?}", user_info);
             let user_name = match config.username_field {
                 UsernameField::PreferredUsername => {
@@ -147,96 +223,6 @@ pub async fn google_auth_callback_handler(
             e
         )),
     }
-}
-
-async fn get_auth_url(config: &OauthConfig, redirect_uri: String) -> String {
-    // define OIDC Parameters
-    let issuer = IssuerUrl::new(config.issuer.clone()).unwrap();
-    let client_id = ClientId::new(config.client_id.clone());
-    let client_secret = ClientSecret::new(config.client_secret.clone());
-    let scope = Scope::new(config.scope.clone());
-
-    // discover metadata from issuer
-    let metadata = CoreProviderMetadata::discover_async(issuer, async_http_client)
-        .await
-        .unwrap();
-
-    // create client from metadata
-    let client = CoreClient::from_provider_metadata(metadata, client_id, Some(client_secret))
-        .set_redirect_uri(RedirectUrl::new(redirect_uri).unwrap());
-
-    // get authorize_url
-    let (auth_url, _, _) = client
-        .authorize_url(
-            AuthenticationFlow::<CoreResponseType>::AuthorizationCode,
-            CsrfToken::new_random,
-            Nonce::new_random,
-        )
-        .add_scope(scope)
-        .url();
-    auth_url.to_string()
-}
-
-async fn exchange_code_for_token(
-    config: &OauthConfig,
-    redirect_uri: String,
-    code: String,
-) -> anyhow::Result<CoreTokenResponse> {
-    // define OIDC Parameters
-    let issuer = IssuerUrl::new(config.issuer.clone()).unwrap();
-    let client_id = ClientId::new(config.client_id.clone());
-    let client_secret = ClientSecret::new(config.client_secret.clone());
-
-    let metadata = CoreProviderMetadata::discover_async(issuer, async_http_client)
-        .await
-        .unwrap();
-
-    let client = CoreClient::from_provider_metadata(metadata, client_id, Some(client_secret))
-        .set_redirect_uri(RedirectUrl::new(redirect_uri).unwrap());
-
-    // exchange provided code for auth token
-    let token = match client
-        .exchange_code(AuthorizationCode::new(code))
-        .request_async(async_http_client)
-        .await
-    {
-        Ok(token) => token,
-        Err(e) => {
-            log::error!("{:?}", e);
-            return Err(e.into());
-        }
-    };
-
-    println!("{:#?}", serde_json::to_string(&token)?);
-
-    Ok(token)
-}
-
-async fn fetch_user_info(
-    config: &OauthConfig,
-    redirect_uri: String,
-    access_token: AccessToken,
-) -> Result<CoreUserInfoClaims, Box<dyn std::error::Error>> {
-    // Define OIDC parameters
-    let issuer = IssuerUrl::new(config.issuer.clone()).unwrap();
-    let client_id = ClientId::new(config.client_id.clone());
-    let client_secret = ClientSecret::new(config.client_secret.clone());
-    let metadata = CoreProviderMetadata::discover_async(issuer, async_http_client)
-        .await
-        .unwrap();
-
-    // Create a Google OpenID Connect client
-    let client = CoreClient::from_provider_metadata(metadata, client_id, Some(client_secret))
-        .set_redirect_uri(RedirectUrl::new(redirect_uri).unwrap());
-
-    // Fetch user info using the access token
-    let user_info = client
-        .user_info(access_token, None)
-        .unwrap()
-        .request_async(async_http_client)
-        .await?;
-
-    Ok(user_info)
 }
 
 #[derive(serde::Deserialize, Debug)]
